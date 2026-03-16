@@ -1,0 +1,81 @@
+---
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-*,
+  modernize-*,
+  portability-*,
+  cppcoreguidelines-*,
+  hicpp-*,
+  misc-*,
+
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -hicpp-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-owning-memory,
+  -hicpp-no-array-decay,
+  -modernize-use-nodiscard,
+  -portability-avoid-pragma-once,
+  -bugprone-easily-swappable-parameters,
+  -misc-non-private-member-variables-in-classes,
+  -readability-named-parameter,
+  -hicpp-named-parameter,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -readability-isolate-declaration,
+  -readability-identifier-length,
+  -bugprone-macro-parentheses
+
+WarningsAsErrors: >
+  clang-analyzer-*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  hicpp-*,
+  performance-*,
+  readability-*
+
+HeaderFilterRegex: '.*'
+FormatStyle: file
+
+CheckOptions:
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+
+  - key: modernize-use-auto.MinTypeNameLength
+    value: '5'
+
+  - key: modernize-loop-convert.MaxCopySize
+    value: '16'
+
+  - key: performance-move-const-arg.CheckTriviallyCopyable
+    value: 'true'
+
+  - key: performance-for-range-copy.WarnOnAllAutoCopies
+    value: 'true'
+
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+
+  - key: readability-identifier-naming.StructCase
+    value: aNy_CasE
+
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE

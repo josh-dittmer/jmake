@@ -1,0 +1,6 @@
+If:
+  PathMatch: old/.*
+Index:
+  Background: Skip
+Diagnostics:
+  Suppress: '*'
