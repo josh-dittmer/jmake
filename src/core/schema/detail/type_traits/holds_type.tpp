@@ -9,16 +9,18 @@ namespace core::schema::detail {
 
 // clang-format off
 template <
-    typename OutType
+    typename OutType,
+    typename InType
 >
 template <
     typename Derived
 >
 auto HoldsType<
-    OutType
+    OutType,
+    InType
 >::Impl<
     Derived
->::check_against_tags(const OutType& value) const
+>::check_against_tags(const InType& value) const
 // clang-format on
 {
     const auto& d_ref = *static_cast<const Derived*>(this);

@@ -1,8 +1,10 @@
 {
-    "opt1": 1,
-    "opt3": {
-        "poop1": 1,
-        "poop2": 2,
-        "poop3": 3
-    }
+    "opt1": "val1",
+    "opt3.otherkey": 1,
+    "nested_arr": [{
+        "opt1": "val1",
+        "opt2": "Val2"
+    }],
+    "nested_dict.key1.opt1": "str",
+    "test": "value"
 }

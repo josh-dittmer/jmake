@@ -9,16 +9,35 @@
 namespace core::schema::detail {
 
 struct SchemaError {
-    explicit SchemaError(std::string msg) : m_msg(std::move(msg)) {}
-
     std::string m_msg;
     std::vector<std::string> m_bt;
-
-    void add_bt(const std::string& bt) { m_bt.push_back(bt); }
 };
 
 template <typename T = None> //
 using SchemaResult = Result<T, Error<SchemaError>>;
+
+// creates a new SchemaError
+extern constexpr auto
+schema_err(std::string msg, std::string bt,
+           std::source_location location = std::source_location::current());
+
+// creates a new SchemaError with an empty backtrace
+template <typename T, typename U>
+extern constexpr auto
+schema_err(Result<T, Error<U>>& res,
+           std::source_location location = std::source_location::current());
+
+// creates a new SchemaError
+template <typename T, typename U>
+extern constexpr auto
+schema_err(Result<T, Error<U>>& res, std::string bt,
+           std::source_location location = std::source_location::current());
+
+// adds to backtrace of existing SchemaError
+template <typename T>
+extern constexpr auto
+schema_err(SchemaResult<T>& res, std::string bt,
+           std::source_location location = std::source_location::current());
 
 } // namespace core::schema::detail
 

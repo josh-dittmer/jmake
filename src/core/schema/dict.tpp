@@ -39,17 +39,15 @@ auto IsType<
 // clang-format off
 template <
     typename ValueType,
-    typename KeyType,
     typename... Tags
 >
 template <
     typename T
 >
-detail::SchemaResult<std::map<KeyType, typename ValueType::out_type>> Dict<
+auto Dict<
     ValueType,
-    KeyType,
     meta::List<Tags...>
->::load(const T& load_from) const
+>::load(const T& load_from) const -> detail::SchemaResult<typename Dict::in_type>
 // clang-format on
 {
     auto load_res = Loader<T>::for_dict(*this, load_from);
@@ -57,14 +55,13 @@ detail::SchemaResult<std::map<KeyType, typename ValueType::out_type>> Dict<
         return err(load_res);
     }
 
-    typename Dict::out_type result;
+    typename Dict::in_type result;
 
     // load dict values
     for (const auto& [key, value] : load_res.unwrap()) {
         auto val_res = m_type.load(value);
         if (!val_res.ok()) {
-            val_res.unwrap_err().get().add_bt(key);
-            return err(val_res);
+            return detail::schema_err(val_res, key);
         }
 
         result.insert(std::make_pair(key, val_res.unwrap()));
@@ -82,7 +79,6 @@ detail::SchemaResult<std::map<KeyType, typename ValueType::out_type>> Dict<
 // clang-format off
 template <
     typename ValueType,
-    typename KeyType,
     typename... Tags
 >
 template <
@@ -90,9 +86,10 @@ template <
 >
 auto Dict<
     ValueType,
-    KeyType,
     meta::List<Tags...>
->::add_tag(Tag_ tag) {
+>::add_tag(Tag_ tag)
+// clang-format on
+{
     // clang-format off
     return typename Dict::append_tag<Tag_>{
         std::move(this->m_type),
@@ -102,6 +99,75 @@ auto Dict<
         )
     };
     // clang-format on
+}
+
+// clang-format off
+template <
+    typename ValueType,
+    typename... Tags
+>
+void Dict<
+    ValueType,
+    meta::List<Tags...>
+>::combine(Dict::in_type& base, Dict::in_type& input)
+// clang-format on
+{
+    for (auto& [key, val] : input) {
+        if (base.contains(key)) {
+            ValueType::combine(base[key], val);
+        }
+
+        else {
+            base.insert({key, std::move(val)});
+        }
+    }
+}
+
+// clang-format off
+template <
+    typename ValueType,
+    typename... Tags
+>
+auto Dict<
+    ValueType,
+    meta::List<Tags...>
+>::to_out(Dict::in_type& base) const -> detail::SchemaResult<typename Dict::out_type>
+// clang-format on
+{
+    typename Dict::out_type result;
+
+    for (auto& [key, val] : base) {
+        auto out_res = m_type.to_out(val);
+        if (!out_res.ok()) {
+            return detail::schema_err(out_res, key);
+        }
+
+        auto& out = out_res.unwrap();
+
+        result.insert({key, std::move(out)});
+    }
+
+    return ok(std::move(result));
+}
+
+// clang-format off
+template <
+    typename ValueType,
+    typename... Tags
+>
+auto Dict<
+    ValueType,
+    meta::List<Tags...>
+>::get_default_value() const -> Opt<typename Dict::out_type>
+// clang-format on
+{
+    if constexpr (has_tag<tags::empty_as_default>) {
+        return typename Dict::out_type{};
+    }
+
+    else {
+        return std::nullopt;
+    }
 }
 
 // clang-format off

@@ -4,6 +4,7 @@
 
 #include "detail/builder.h"
 #include "loader/loader.h"
+#include "tag.h"
 #include "util/meta/formattable.h"
 
 namespace core::schema {
@@ -19,18 +20,19 @@ template <
 template <
     typename T
 >
-detail::SchemaResult<Type> GenericType<
+auto GenericType<
     Type,
     TypeComp,
     DefaultValue,
     meta::List<Values...>,
     meta::List<Tags...>
->::load(const T& load_from) const
+>::load(const T& load_from) const -> detail::SchemaResult<typename GenericType::in_type>
 // clang-format on
 {
-    Result<Type> load_res = Loader<T>::for_generic_type(*this, load_from);
+    Result<typename GenericType::in_type> load_res =
+        Loader<T>::for_generic_type(*this, load_from);
     if (!load_res.ok()) {
-        return err(load_res);
+        return detail::schema_err(load_res);
     }
 
     return load(load_res.unwrap());
@@ -45,13 +47,13 @@ template <
     typename... Values,
     typename... Tags
 >
-detail::SchemaResult<Type> GenericType<
+auto GenericType<
     Type,
     TypeComp,
     DefaultValue,
     meta::List<Values...>,
     meta::List<Tags...>
->::load(const Type& load_from) const
+>::load(const Type& load_from) const -> detail::SchemaResult<typename GenericType::in_type>
 // clang-format on
 {
     if constexpr (sizeof...(Tags) <= 0) {
@@ -60,7 +62,7 @@ detail::SchemaResult<Type> GenericType<
 
     auto check_res = this->check_against_tags(load_from);
     if (!check_res.ok()) {
-        return err(check_res);
+        return detail::schema_err(check_res);
     }
 
     return ok(load_from);
@@ -192,16 +194,82 @@ auto GenericType<
 template <
     typename Type,
     typename TypeComp,
+    typename DefaultValue,
+    typename... Values,
+    typename... Tags
+>
+void GenericType<
+    Type,
+    TypeComp,
+    DefaultValue,
+    meta::List<Values...>,
+    meta::List<Tags...>
+>::combine(GenericType::in_type& base, GenericType::in_type& input)
+// clang-format on
+{
+    base = std::move(input);
+}
+
+// clang-format off
+template <
+    typename Type,
+    typename TypeComp,
+    typename DefaultValue,
+    typename... Values,
+    typename... Tags
+>
+auto GenericType<
+    Type,
+    TypeComp,
+    DefaultValue,
+    meta::List<Values...>,
+    meta::List<Tags...>
+>::get_default_value() const -> Opt<typename GenericType::out_type>
+// clang-format off
+{
+    if constexpr (std::same_as<DefaultValue, None>) {
+        return std::nullopt;
+    }
+
+    else if constexpr (has_tag<tags::empty_as_default>) {
+        return typename GenericType::out_type{};
+    }
+
+    else {
+        return typename GenericType::out_type{m_default_value.get_value()};
+    }
+}
+
+
+// clang-format off
+template <
+    typename Type,
+    typename TypeComp,
     typename... Ts
 >
 // clang-format on
 auto type(Ts... builders) {
     // clang-format off
-    return detail::apply_builders(
+    auto type = detail::apply_builders(
         GenericType<Type, TypeComp>{},
         std::move(builders)...
     );
     // clang-format on
+
+    // if type is an std::optional, give it a default value of
+    // std::nullopt. this effectively enables optional properties
+    if constexpr (meta::is_specialization_of_v<std::optional, Type>) {
+        // clang-format off
+        return detail::apply_builders(
+            std::move(type),
+            default_value(std::nullopt)
+        );
+        // clang-format on
+    }
+
+    else {
+        return type;
+    }
 }
 
 namespace tags {

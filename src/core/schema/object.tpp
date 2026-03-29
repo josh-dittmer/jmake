@@ -4,7 +4,7 @@
 
 #include "detail/builder.h"
 #include "loader/loader.h"
-#include "util/meta/for_each.h"
+#include "util/meta/matched_for_each.h"
 #include "util/result/result_pack.h"
 
 namespace core::schema {
@@ -18,11 +18,11 @@ template <
 template <
     typename... Ts
 >
-detail::SchemaResult<OutType> Object<
+auto Object<
     OutType,
     meta::List<Tags...>,
     meta::List<Properties...>
->::load(const Ts&... load_from) const {
+>::load(const Ts&... load_from) const -> detail::SchemaResult<typename Object::in_type> {
     auto load_pack = result_pack(Loader<Ts>::for_object(*this, load_from)...);
     
     auto load_res = load_pack.ok();
@@ -30,12 +30,10 @@ detail::SchemaResult<OutType> Object<
         return err(load_res);
     }
 
-    OutType result;
+    typename Object::in_type result;
 
     // for each property
-    auto prop_res = meta::for_each_until(m_properties, [&](const auto& prop) -> detail::SchemaResult<> {
-        using T = std::remove_cvref_t<decltype(prop)>;
-        
+    auto prop_res = meta::matched_for_each_until(m_properties, result.m_data, [&](const auto& prop, auto& in) -> detail::SchemaResult<> {        
         // attempt to load
         auto load_res = load_pack.unwrap([&](const auto&... load_from) {
             return prop.load(load_from...);
@@ -46,7 +44,7 @@ detail::SchemaResult<OutType> Object<
         }
 
         // all is good? assign
-        result.*T::out_ref = std::move(load_res.unwrap());
+        in = std::move(load_res.unwrap());
 
         return ok();
     });
@@ -116,6 +114,123 @@ auto Object<
         )
     };
     // clang-format on
+}
+
+// clang-format off
+template <
+    typename OutType,
+    typename... Tags,
+    typename... Properties
+>
+void Object<
+    OutType,
+    meta::List<Tags...>,
+    meta::List<Properties...>
+>::combine(Object::in_type& base, Object::in_type& input)
+// clang-format on
+{
+    // loop through each input property and assign to base if set
+    meta::matched_for_each(base.m_data, input.m_data, [&](auto& bp, auto& ip) {
+        if (!bp.m_data && ip.m_data) {
+            bp.m_data = ip.m_data;
+            base.m_num_set++;
+        }
+    });
+}
+
+// clang-format off
+template <
+    typename OutType,
+    typename... Tags,
+    typename... Properties
+>
+bool Object<
+    OutType,
+    meta::List<Tags...>,
+    meta::List<Properties...>
+>::satisfied(const Object::in_type& base)
+// clang-format on
+{
+    return base.m_num_set >= base.size;
+}
+
+// clang-format off
+template <
+    typename OutType,
+    typename... Tags,
+    typename... Properties
+>
+auto Object<
+    OutType,
+    meta::List<Tags...>,
+    meta::List<Properties...>
+>::to_out(Object::in_type& base) const -> detail::SchemaResult<typename Object::out_type>
+// clang-format on
+{
+    typename Object::out_type result;
+
+    // clang-format off
+    auto fill_res = meta::matched_for_each_until(m_properties, base.m_data, [&](auto& prop, auto& prop_in) -> detail::SchemaResult<> {
+        auto prop_res = prop.to_out(prop_in);
+        if (!prop_res.ok()) {
+            return err(prop_res);
+        }
+
+        // assign field in result type
+        result.*(prop_in.out_ref) = std::move(prop_res.unwrap());
+
+        return ok();
+    });
+    // clang-format on
+
+    if (!fill_res.ok()) {
+        return err(fill_res);
+    }
+
+    return ok(std::move(result));
+}
+
+// clang-format off
+template <
+    typename OutType,
+    typename... Tags,
+    typename... Properties
+>
+auto Object<
+    OutType,
+    meta::List<Tags...>,
+    meta::List<Properties...>
+>::get_default_value() const -> Opt<typename Object::out_type>
+// clang-format on
+{
+    typename Object::out_type result;
+
+    bool missing = false;
+
+    // clang-format off
+    meta::for_each(m_properties, [&](auto& prop) {
+        if (missing) {
+            return;
+        }
+        
+        auto dv = prop.get_default_value();
+
+        // no default value? exit
+        if (!dv) {
+            missing = true;
+            return;
+        }
+
+        // assign field in result type
+        result.*(prop.out_ref) = std::move(*dv);
+    });
+    // clang-format on
+
+    if (missing) {
+        return std::nullopt;
+    }
+
+    return std::move(result);
 }
 
 // clang-format off

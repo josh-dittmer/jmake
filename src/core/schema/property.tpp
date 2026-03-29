@@ -1,10 +1,11 @@
 #pragma once
 
+#include "core/schema/detail/common.h"
 #include "core/schema/detail/schema_error.h"
-#include "property.h"
-
+#include "core/schema/tag.h"
 #include "detail/builder.h"
 #include "generic_type.h"
+#include "property.h"
 #include "util/meta/for_each.h"
 #include "util/optional/optional.h"
 
@@ -50,22 +51,24 @@ template <
 template <
     typename... Ts
 >
-detail::SchemaResult<typename Type::out_type> Property<
+auto Property<
     OutRef,
     Type,
     meta::List<Tags...>
->::load(const Ts&... load_from) const
+>::load(const Ts&... load_from) const -> detail::SchemaResult<typename Property::in_type>
 // clang-format on
 {
-    Opt<typename Type::out_type> result;
+    Opt<typename Type::in_type> base;
+
+    bool satisfied = false;
 
     // for each loader
     auto load_res = meta::for_each_until<const Ts&...>(
         load_from..., [&](const auto& load_from) -> detail::SchemaResult<> {
             using T = std::remove_cvref_t<decltype(load_from)>;
 
-            // skip if we already have a value
-            if (result.has_value()) {
+            // satisfied? do nothing
+            if (satisfied) {
                 return ok();
             }
 
@@ -75,25 +78,35 @@ detail::SchemaResult<typename Type::out_type> Property<
                 return err(load_res);
             }
 
+            // value is an std::optional
             const auto& value = load_res.unwrap();
 
-            // no value? move on to next loader (without setting result)
+            // no value? move on to next loader (no combine step)
             if (!value) {
                 return ok();
             }
 
-            // load actual value
-            auto val_res = m_type.load((*value).get());
+            // use property's held type to load actual value
+            auto val_res = m_type.load(*value);
             if (!val_res.ok()) {
-                // record readable id for error handling purposes
+                // record readable id for debugging purposes
                 std::string readable_id = Loader<T>::readable_id(*this);
-                val_res.unwrap_err().get().add_bt(std::move(readable_id));
 
-                return err(val_res);
+                return detail::schema_err(val_res, std::move(readable_id));
             }
 
-            // all is good? set result
-            result = val_res.unwrap();
+            // first value? set base
+            if (!base) {
+                base = val_res.unwrap();
+            }
+
+            // otherwise, combine with previous
+            else {
+                Type::combine(*base, val_res.unwrap());
+            }
+
+            // check if we're satisfied
+            satisfied = Type::satisfied(*base);
 
             return ok();
         });
@@ -102,39 +115,15 @@ detail::SchemaResult<typename Type::out_type> Property<
         return err(load_res);
     }
 
-    // is this property optional? if so we can unconditionally return
-    if constexpr (is_optional) {
-        // if we have value, make sure property itself is valid
-        if (result) {
-            auto check_res = this->check_against_tags(*result);
-            if (!check_res.ok()) {
-                return err(check_res);
-            }
+    typename Property::in_type prop_in{std::move(base)};
 
-            return ok(std::move(*result));
-        }
-
-        return ok(std::nullopt);
+    // make sure property itself is valid
+    auto check_res = this->check_against_tags(prop_in);
+    if (!check_res.ok()) {
+        return err(check_res);
     }
 
-    // otherwise make sure we have a value
-    else {
-        if (!result) {
-            // clang-format off
-            return err(detail::SchemaError{
-                "missing required value"
-            });
-            // clang-format on
-        }
-
-        // make sure property itself is valid
-        auto check_res = this->check_against_tags(*result);
-        if (!check_res.ok()) {
-            return err(check_res);
-        }
-
-        return ok(std::move(*result));
-    }
+    return ok(std::move(prop_in));
 }
 
 // clang-format off
@@ -165,6 +154,66 @@ auto Property<
 // clang-format off
 template <
     auto OutRef,
+    typename Type,
+    typename... Tags
+>
+auto Property<
+    OutRef,
+    Type,
+    meta::List<Tags...>
+>::to_out(typename Property::in_type& base) const -> detail::SchemaResult<typename Property::out_type>
+// clang-format off
+{
+    // no value? try using default value
+    if (!base.m_data) {
+        auto default_value = get_default_value();
+
+        // if not, error out
+        if (!default_value) {
+            if constexpr(has_tag<tags::name>) {
+                const auto& name = std::get<tags::name>(m_tags).m_name;
+                return detail::schema_err("missing required value", name);
+            } else {
+                return detail::schema_err("missing required value", "[?]");
+            }
+        }
+
+        return ok(std::move(*default_value));
+    }
+
+    // try converting to output type
+    auto out_res = m_type.to_out(*base.m_data);
+    if (!out_res.ok()) {
+        if constexpr(has_tag<tags::name>) {
+            const auto& name = std::get<tags::name>(m_tags).m_name;
+            return detail::schema_err(out_res, name);
+        } else {
+            return detail::schema_err(out_res, "[?]");
+        }
+    }
+
+    return ok(out_res);
+}
+
+// clang-format off
+template <
+    auto OutRef,
+    typename Type,
+    typename... Tags
+>
+auto Property<
+    OutRef,
+    Type,
+    meta::List<Tags...>
+>::get_default_value() const -> Opt<typename Property::out_type>
+// clang-format on
+{
+    return m_type.get_default_value();
+}
+
+// clang-format off
+template <
+    auto OutRef,
     detail::is_type Type,
     typename... Ts
 >
@@ -183,9 +232,9 @@ template <
 // clang-format on
 auto property(Ts... builders) {
     // clang-format off
-    return GenericType<
+    return type<
         decltype(detail::deduce_member_type(OutRef))
-    >{}.template as_prop<OutRef>(std::move(builders)...);
+    >().template as_prop<OutRef>(std::move(builders)...);
     // clang-format on
 }
 

@@ -28,7 +28,7 @@ constexpr auto for_each_until_impl(
     ResultType res = ok();
     (
         (res = res.and_then([&](auto) { 
-            return func(std::get<Is>(std::forward<Tuple>(tuple))); 
+            return std::forward<Func>(func)(std::get<Is>(std::forward<Tuple>(tuple))); 
         })), 
         ...
     );

@@ -7,9 +7,10 @@
 #include "tag.h"
 #include "util/meta/list.h"
 #include "util/meta/specialization_of.h"
+#include "util/optional/optional.h"
 
-#include <map>
-#include <string>
+#include <map>    // IWYU pragma: keep
+#include <string> // IWYU pragma: keep
 #include <tuple>
 
 namespace core::schema {
@@ -17,7 +18,6 @@ namespace core::schema {
 // clang-format off
 template <
     typename ValueType,
-    typename KeyType = std::string,
     typename TagsList = meta::List<>
 >
 // clang-format on
@@ -40,17 +40,18 @@ concept dict_tag = is_dict<T> && tag_for<T, Tag>;
 // clang-format off
 template <
     typename ValueType,
-    typename KeyType,
     typename... Tags
 >
 struct Dict<
     ValueType,
-    KeyType,
     meta::List<Tags...>
 > : public detail::ApplyTraits<
-    Dict<ValueType, KeyType, meta::List<Tags...>>,
+    Dict<ValueType, meta::List<Tags...>>,
     detail::IsType,
-    detail::HoldsType<std::map<KeyType, typename ValueType::out_type>>::template Impl
+    detail::HoldsType<
+        std::map<std::string, typename ValueType::out_type>,
+        std::map<std::string, typename ValueType::in_type>
+    >::template Impl
 >
 // clang-format on
 {
@@ -80,7 +81,7 @@ struct Dict<
 
     template <typename T>
     // clang-format off
-    detail::SchemaResult<std::map<KeyType, typename ValueType::out_type>> load(const T& load_from) const;
+    auto load(const T& load_from) const -> detail::SchemaResult<typename Dict::in_type>;
     // calang-format on
 
     // clang-format off
@@ -91,12 +92,19 @@ struct Dict<
     const auto& get_type() const { return m_type; }
     const auto& get_tags() const { return m_tags; }
 
+    static void combine(Dict::in_type& base, Dict::in_type& input);
+    static bool satisfied(const Dict::in_type&) { return false; }
+
+    auto to_out(Dict::in_type& base) const
+        -> detail::SchemaResult<typename Dict::out_type>;
+
+    auto get_default_value() const -> Opt<typename Dict::out_type>;
+
   private:
     template <typename Tag_>
     // clang-format off
     using append_tag = Dict<
         ValueType,
-        KeyType,
         meta::List<Tag_, Tags...>
     >;
     // clang-format on

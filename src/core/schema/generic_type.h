@@ -7,6 +7,7 @@
 #include "tag.h"
 #include "util/meta/list.h"
 #include "util/meta/specialization_of.h"
+#include "util/optional/optional.h"
 #include "value.h"
 
 #include <functional>
@@ -56,8 +57,10 @@ struct GenericType<
 > : public detail::ApplyTraits<
     GenericType<Type, TypeComp, DefaultValue, meta::List<Values...>, meta::List<Tags...>>,
     detail::IsType,
-    detail::HoldsType<Type>::template Impl
->
+    detail::HoldsType<
+        Type,
+        Type
+    >::template Impl>
 // clang-format on
 {
     template <typename T>
@@ -90,11 +93,13 @@ struct GenericType<
 
     template <typename T>
     // clang-format off
-    detail::SchemaResult<Type> load(const T& load_from) const;
+    auto load(const T& load_from) const -> detail::SchemaResult<typename GenericType::in_type>;
     // clang-format on
 
     // already at correct type
-    detail::SchemaResult<Type> load(const Type& load_from) const;
+    // clang-format off
+    auto load(const Type& load_from) const -> detail::SchemaResult<typename GenericType::in_type>;
+    // clang-format on
 
     bool has_value(const Type& value) const;
 
@@ -114,8 +119,20 @@ struct GenericType<
     // clang-format on
 
     const auto& get_tags() const { return m_tags; }
-    const auto& get_default_value() const { return m_default_value; }
     const auto& get_values() const { return m_values; }
+
+    static void combine(GenericType::in_type& base,
+                        GenericType::in_type& input);
+
+    static bool satisfied(const GenericType::in_type&) { return true; }
+
+    // clang-format off
+    auto to_out(GenericType::in_type& base) const -> detail::SchemaResult<typename GenericType::out_type> {
+        return ok(std::move(base));
+    }
+    // clang-format on
+
+    auto get_default_value() const -> Opt<typename GenericType::out_type>;
 
   private:
     template <typename Tag_>
@@ -171,7 +188,7 @@ extern auto type(Ts... builders);
 
 namespace tags {
 
-// allow any value
+// only allow defined values
 struct restricted {
     template <is_generic_type T>
     Result<> check(const T& type, const T::out_type& value) const;

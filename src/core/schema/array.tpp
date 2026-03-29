@@ -2,9 +2,12 @@
 
 #include "array.h"
 
+#include "core/schema/detail/schema_error.h"
 #include "core/schema/detail/type_traits/is_type.h"
 #include "detail/builder.h"
 #include "generic_type.h"
+
+#include <iterator>
 
 namespace core::schema {
 
@@ -45,10 +48,10 @@ template <
 template <
     typename T
 >
-detail::SchemaResult<std::vector<typename Type::out_type>> Array<
+auto Array<
     Type,
     meta::List<Tags...>
->::load(const T& load_from) const
+>::load(const T& load_from) const -> detail::SchemaResult<typename Array::in_type>
 // clang-format on
 {
     auto load_res = Loader<T>::for_array(*this, load_from);
@@ -56,7 +59,7 @@ detail::SchemaResult<std::vector<typename Type::out_type>> Array<
         return err(load_res);
     }
 
-    typename Array::out_type result;
+    typename Array::in_type result;
 
     const auto& arr = load_res.unwrap();
 
@@ -64,8 +67,7 @@ detail::SchemaResult<std::vector<typename Type::out_type>> Array<
     for (std::size_t i = 0; i < arr.size(); i++) {
         auto val_res = m_type.load(arr[i]);
         if (!val_res.ok()) {
-            val_res.unwrap_err().get().add_bt(std::format("[{}]", i));
-            return err(val_res);
+            return detail::schema_err(val_res, std::format("[{}]", i));
         }
 
         result.push_back(val_res.unwrap());
@@ -103,6 +105,76 @@ auto Array<
         )
     };
     // clang-format on
+}
+
+// clang-format off
+template <
+    typename Type,
+    typename... Tags
+>
+auto Array<
+    Type,
+    meta::List<Tags...>
+>::to_out(Array::in_type& base) const -> detail::SchemaResult<typename Array::out_type>
+// clang-format on
+{
+    typename Array::out_type result;
+    result.reserve(base.size());
+
+    for (std::size_t i = 0; i < base.size(); i++) {
+        auto& val = base[i];
+
+        auto out_res = m_type.to_out(val);
+        if (!out_res.ok()) {
+            return detail::schema_err(out_res, std::format("[{}]", i));
+        }
+
+        auto& out = out_res.unwrap();
+
+        result.push_back(std::move(out));
+    }
+
+    return ok(result);
+}
+
+// clang-format off
+template <
+    typename Type,
+    typename... Tags
+>
+void Array<
+    Type,
+    meta::List<Tags...>
+>::combine(Array::in_type& base, Array::in_type& input)
+// clang-format on
+{
+    // clang-format off
+    base.insert(
+        base.end(), 
+        std::make_move_iterator(input.begin()),
+        std::make_move_iterator(input.end())
+    );
+    // clang-format on
+}
+
+// clang-format off
+template <
+    typename Type,
+    typename... Tags
+>
+auto Array<
+    Type,
+    meta::List<Tags...>
+>::get_default_value() const -> Opt<typename Array::out_type>
+// clang-format on
+{
+    if constexpr (has_tag<tags::empty_as_default>) {
+        return typename Array::out_type{};
+    }
+
+    else {
+        return std::nullopt;
+    }
 }
 
 // clang-format off

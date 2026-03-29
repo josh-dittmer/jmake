@@ -1,8 +1,22 @@
 #pragma once
 
+#include <string>
 #include <utility>
 
 namespace core::schema {
+
+// common tags
+namespace tags {
+
+// if missing, use an empty container as the default value
+struct empty_as_default {};
+
+// provide a readable name
+struct name {
+    std::string m_name;
+};
+
+} // namespace tags
 
 namespace detail {
 

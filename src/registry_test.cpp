@@ -1,12 +1,19 @@
 #include "registry_test.h"
 
 #include "core/schema/detail/schema_error.h"
+#include "core/schema/generic_type.h"
 #include "core/schema/schema.h"
+#include "util/cmd/cmd_args.h"
 #include "util/json/safe_parse.h"
 
 #include <nlohmann/json.hpp>
 #include <print>
 #include <string>
+
+struct NestedTest {
+    std::string m_opt1;
+    std::string m_opt2;
+};
 
 struct MainConfig { // NOLINT
     struct DatabaseConfig {
@@ -26,6 +33,9 @@ struct MainConfig { // NOLINT
     std::string m_opt1;
     std::vector<std::string> m_opt2;
     std::map<std::string, int> m_opt3;
+    NestedTest m_opt4;
+    std::vector<NestedTest> m_opt5;
+    std::map<std::string, NestedTest> m_opt6;
 };
 
 struct SpecificCommandConfig1 {
@@ -71,76 +81,20 @@ NLOHMANN_JSON_SERIALIZE_ENUM(TestEnum, {
                                            {FOUR, "four4"},
                                        })
 
-void test() {
+void test(int argc, char* argv[]) { // NOLINT
     // clang-format off
     using namespace core::schema;
     using namespace core::schema::tags;
 
-    /*
-    
-    auto my_schema = schema<...>(...);
-
-    auto res = my_schema.load<Subconfig>(
-        json(my_json),
-        cmd(my_cmd),
-        env(),
-        defaults()
-    );
-
-    */
-
-    /*auto test_obj = object<MainConfig>(
-        property<&MainConfig::m_opt1>(
-            dict(
-                type<std::string>(
-                    default_value("val1"),
-                    value("val2"),
-                    value("val3")
-                )
-            ),
-            tag<json_id>("opt1"),
-            tag<cmd_id>("--opt1")
-        ),
-        property<&MainConfig::m_opt2>(
-            array(
-                type<std::string>(
-                    value("val1"),
-                    value("val2"),
-                    value("val3")
-                )
-            ),
-            tag<json_id>("opt2"),
-            tag<cmd_id>("--opt2")
-        )
-    );
-
-    auto test_schema = schema<MainConfig>(
-        property<&MainConfig::m_opt1>(
-            array<std::string>()
-        ),
-        property<&MainConfig::m_opt2>(
-            dict<std::string>()
-        ),
-        subschema<&SpecificCommandConfig1::m_parent>(
-            subschema<&EvenDeeper::m_parent>(
-                property<&EvenDeeper::m_opt>(
-                    type<std::string>(
-                        value("val1"),
-                        value("val2"),
-                        value("val3")
-                    )
-                )
-            )
-        )
-    );*/
-
     auto test_object = object<MainConfig>(
         property<&MainConfig::m_opt1>(
-            tag<json_id>("opt1")
+            tag<json_id>("opt1"),
+            tag<name>("Option 1")
         ),
         property<&MainConfig::m_opt2>(
             array<std::string>(),
-            tag<json_id>("opt2")
+            tag<json_id>("opt2"),
+            tag<name>("Option 2")
         ),
         property<&MainConfig::m_opt3>(
             dict(
@@ -149,9 +103,73 @@ void test() {
                     tag(max(50))
                 )
             ),
-            tag<json_id>("opt3")
+            tag<json_id>("opt3"),
+            tag<name>("Option 3")
+        ),
+        property<&MainConfig::m_opt4>(
+            object<NestedTest>(
+                property<&NestedTest::m_opt1>(
+                    type<std::string>(
+                        default_value("default_1")
+                    ),
+                    tag<json_id>("opt1"),
+                    tag<name>("Nested option 1")
+                ),
+                property<&NestedTest::m_opt2>(
+                    type<std::string>(
+                        default_value("default_2")
+                    ),
+                    tag<json_id>("opt2"),
+                    tag<name>("Nested option 2")
+                )
+            ),
+            tag<json_id>("nested"),
+            tag<name>("Nested")
+        ),
+        property<&MainConfig::m_opt5>(
+            array(object<NestedTest>(
+                property<&NestedTest::m_opt1>(
+                    tag<json_id>("opt1"),
+                    tag<name>("Array option 1")
+                ),
+                property<&NestedTest::m_opt2>(
+                    tag<json_id>("opt2"),
+                    tag<name>("Array option 2")
+                )
+            )),
+            tag<json_id>("nested_arr"),
+            tag<name>("Array")
+        ),
+        property<&MainConfig::m_opt6>(
+            dict(object<NestedTest>(
+                property<&NestedTest::m_opt1>(
+                    tag<json_id>("opt1"),
+                    tag<name>("Dict option 1")
+                ),
+                property<&NestedTest::m_opt2>(
+                    type<std::string>(
+                        default_value("test_default_value")
+                    ),
+                    tag<json_id>("opt2"),
+                    tag<name>("Dict option 1")
+                )
+            )),
+            tag<json_id>("nested_dict"),
+            tag<name>("Dict")
         )
     );
+
+    /*auto test_object = object<MainConfig>(
+        property<&MainConfig::m_opt1>(
+            tag<json_id>("test")    
+        )
+    );*/
+
+    auto cmd_args = CmdArgs::from_space_delimited(argc, argv);
+
+    for (const auto& [key, val] : cmd_args.get()) {
+        std::println("{}: {}", key, val.value_or("(none)"));
+    }
 
     auto json1_res = util::json::safe_parse_file("./resources/test1.json");
     if (!json1_res.ok()) {
@@ -171,12 +189,37 @@ void test() {
     auto res = test_object.load(json2, json1);
     if (!res.ok()) {
         std::println("Error: {:t}", res.unwrap_err());
-    } else {
-        const auto& val = res.unwrap();
-
-        std::println("{}", val.m_opt1);
-        std::println("{}", val.m_opt2);
-        std::println("{}", val.m_opt3);
+        return;
     }
+
+    auto test_out = test_object.to_out(res.unwrap());
+    if (!test_out.ok()) {
+        std::println("Error: {:t}", test_out.unwrap_err());
+        return;
+    }
+
+    const auto& out = test_out.unwrap();
+
+    std::println("m_opt1: {}", out.m_opt1);
+    std::println("m_opt2: {}", out.m_opt2);
+    std::println("m_opt3: {}", out.m_opt3);
+    std::println("m_opt4:");
+    std::println("\tm_opt1: {}", out.m_opt4.m_opt1);
+    std::println("\tm_opt2: {}", out.m_opt4.m_opt2);
+    std::println("m_opt5: [");
+    for (const auto& i : out.m_opt5) {
+        std::println("\t{{m_opt1: {},", i.m_opt1);
+        std::println("\tm_opt2: {}}},", i.m_opt2);
+    }
+    std::println("]");
+    std::println("m_opt6: {{");
+    for (const auto& [k, v] : out.m_opt6) {
+        std::println("\t{}: {{", k);
+        std::println("\t\tm_opt1: {},", v.m_opt1);
+        std::println("\t\tm_opt2: {}", v.m_opt2);
+        std::println("\t}}");
+    }
+    std::println("}}");
+
     // clang-format on
 }

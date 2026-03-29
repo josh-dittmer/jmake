@@ -3,7 +3,7 @@
 
 #include <print>
 
-struct Test {
+/*struct Test {
     Test() = default;
     Test(Test&&) { // NOLINT
         std::println("Moved!");
@@ -37,17 +37,10 @@ namespace {
 
 Result<Test> call_two() { return ok(Test{}); }
 
-} // namespace
+} // namespace*/
 
-int main() {
-    auto res = call_two();
-
-    if (!res.ok()) {
-        std::println("Error: {}", res.unwrap_err());
-        return -1;
-    }
-
-    test();
+int main(int argc, char* argv[]) {
+    test(argc, argv);
 
     return 0;
 }

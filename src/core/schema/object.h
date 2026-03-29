@@ -7,6 +7,7 @@
 #include "tag.h"
 #include "util/meta/list.h"
 #include "util/meta/specialization_of.h"
+#include "util/optional/optional.h"
 
 #include <tuple>
 
@@ -33,6 +34,18 @@ template <typename T, typename Tag>
 concept object_tag = is_object<T> && tag_for<T, Tag>;
 // clang-format on
 
+// clang-format off
+template <
+    typename... Properties
+>
+// clang-format on
+struct ObjectIn {
+    static constexpr std::size_t size = sizeof...(Properties);
+
+    std::tuple<typename Properties::in_type...> m_data;
+    std::size_t m_num_set = 0;
+};
+
 } // namespace detail
 
 // clang-format off
@@ -48,7 +61,10 @@ struct Object<
 > : public detail::ApplyTraits<
     Object<OutType, meta::List<Tags...>, meta::List<Properties...>>,
     detail::IsType,
-    detail::HoldsType<OutType>::template Impl
+    detail::HoldsType<
+        OutType, 
+        detail::ObjectIn<Properties...>
+    >::template Impl
 >
 // clang-format on
 {
@@ -78,7 +94,7 @@ struct Object<
 
     template <typename... Ts>
     // clang-format off
-    detail::SchemaResult<OutType> load(const Ts&... load_from) const;
+    auto load(const Ts&... load_from) const -> detail::SchemaResult<typename Object::in_type>;
     // clang-format on
 
     // clang-format off
@@ -93,6 +109,14 @@ struct Object<
 
     const auto& get_tags() const { return m_tags; }
     const auto& get_properties() const { return m_properties; }
+
+    static void combine(Object::in_type& base, Object::in_type& input);
+    static bool satisfied(const Object::in_type&);
+
+    auto to_out(Object::in_type& base) const
+        -> detail::SchemaResult<typename Object::out_type>;
+
+    auto get_default_value() const -> Opt<typename Object::out_type>;
 
   private:
     template <typename Tag_>

@@ -7,6 +7,7 @@
 #include "tag.h"
 #include "util/meta/list.h"
 #include "util/meta/specialization_of.h"
+#include "util/optional/optional.h"
 
 #include <tuple>
 
@@ -45,7 +46,10 @@ struct Array<
 > : public detail::ApplyTraits<
     Array<Type, meta::List<Tags...>>,
     detail::IsType,
-    detail::HoldsType<std::vector<typename Type::out_type>>::template Impl
+    detail::HoldsType<
+        std::vector<typename Type::out_type>,
+        std::vector<typename Type::in_type>
+    >::template Impl
 >
 // clang-format on
 {
@@ -75,7 +79,7 @@ struct Array<
 
     template <typename T>
     // clang-format off
-    detail::SchemaResult<std::vector<typename Type::out_type>> load(const T& load_from) const;
+    auto load(const T& load_from) const -> detail::SchemaResult<typename Array::in_type>;
     // clang-format on
 
     // clang-format off
@@ -85,6 +89,14 @@ struct Array<
 
     const auto& get_type() const { return m_type; }
     const auto& get_tags() const { return m_tags; }
+
+    static void combine(Array::in_type& base, Array::in_type& input);
+    static bool satisfied(const Array::in_type&) { return false; }
+
+    auto to_out(Array::in_type& base) const
+        -> detail::SchemaResult<typename Array::out_type>;
+
+    auto get_default_value() const -> Opt<typename Array::out_type>;
 
   private:
     template <typename Tag_>

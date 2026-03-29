@@ -6,9 +6,8 @@
 #include "detail/type_traits/is_type.h"
 #include "tag.h"
 #include "util/meta/list.h"
-#include "util/meta/specialization_of.h"
+#include "util/optional/optional.h"
 
-#include <optional>
 #include <tuple>
 
 namespace core::schema {
@@ -58,6 +57,18 @@ template <typename T, typename Tag>
 concept property_tag = is_property<T> && tag_for<T, Tag>;
 // clang-format on
 
+// clang-format off
+template <
+    auto OutRef,
+    typename Type
+>
+// clang-format on
+struct PropertyIn {
+    static constexpr auto out_ref = OutRef;
+
+    Opt<typename Type::in_type> m_data;
+};
+
 } // namespace detail
 
 // clang-format off
@@ -72,22 +83,20 @@ struct Property<
     meta::List<Tags...>
 > : public detail::ApplyTraits<
     Property<OutRef, Type, meta::List<Tags...>>,
-    detail::HoldsType<typename Type::out_type>::template Impl
+    detail::HoldsType<
+        typename Type::out_type,
+        detail::PropertyIn<OutRef, Type>
+    >::template Impl
 >
 // clang-format on
 {
     static constexpr auto out_ref = OutRef;
-
-    using out_ref_type = decltype(detail::deduce_member_type(OutRef));
 
     template <typename T>
     static constexpr bool has_tag = meta::has_type_v<T, Tags...>;
 
     template <typename T>
     static constexpr bool valid_tag = detail::property_tag<Property, T>;
-
-    static constexpr bool is_optional =
-        meta::is_specialization_of_v<std::optional, out_ref_type>;
 
     Property() = default;
     Property(Property&&) noexcept = default;
@@ -109,7 +118,7 @@ struct Property<
 
     template <typename... Ts>
     // clang-format off
-    detail::SchemaResult<typename Type::out_type> load(const Ts&... load_from) const;
+    auto load(const Ts&... load_from) const -> detail::SchemaResult<typename Property::in_type>;
     // clang-format on
 
     // clang-format off
@@ -119,6 +128,11 @@ struct Property<
 
     const auto& get_type() const { return m_type; }
     const auto& get_tags() const { return m_tags; }
+
+    auto to_out(typename Property::in_type& base) const
+        -> detail::SchemaResult<typename Property::out_type>;
+
+    auto get_default_value() const -> Opt<typename Property::out_type>;
 
     // clang-format off
     template <
