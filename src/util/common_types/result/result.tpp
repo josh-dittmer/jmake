@@ -1,7 +1,7 @@
 #pragma once
 
 #include "result.h"
-#include "util/result/error.h"
+#include "util/common_types/result/error.h"
 
 #include <cassert>
 #include <utility>

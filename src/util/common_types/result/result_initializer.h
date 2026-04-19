@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/none.h"
+#include "util/common_types/none.h"
 
 template <typename T, bool Ok> struct ResultInitializer {
     T m_value;

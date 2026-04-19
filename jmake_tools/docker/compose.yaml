@@ -1,0 +1,12 @@
+services:
+  jmake_dev:
+    container_name: "jmake_dev"
+    build:
+      context: "."
+    volumes:
+      - "../..:/app"      
+    networks:
+      - jmake_network
+
+networks:
+  jmake_network:

@@ -2,6 +2,8 @@
 
 #include "util/str/split.h"
 
+namespace util::cmd {
+
 CmdArgs CmdArgs::from_space_delimited(int argc, char* argv[]) { // NOLINT
     DataType data;
 
@@ -58,3 +60,5 @@ Opt<CmdArgs::ValueType> CmdArgs::pop(const std::string& key) {
     m_data.erase(mit);
     return mit->second;
 }
+
+} // namespace util::cmd

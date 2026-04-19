@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/result/result_initializer.h"
+#include "util/common_types/result/result_initializer.h"
 
 #include <format>
 #include <source_location>
@@ -20,12 +20,12 @@ template <typename T = std::string> class Error {
 
     constexpr Error(T&& data, std::source_location location)
         : m_data(std::move(data)) {
-        m_backtrace.emplace_back(std::move(location));
+        m_backtrace.emplace_back(location);
     }
 
     constexpr Error(Error&& error, std::source_location location)
         : Error(std::move(error)) {
-        m_backtrace.emplace_back(std::move(location));
+        m_backtrace.emplace_back(location);
     }
 
     constexpr Error(Error&&) = default;

@@ -1,9 +1,11 @@
 #pragma once
 
-#include "util/optional/optional.h"
+#include "util/common_types/optional/optional.h"
 
 #include <map>
 #include <string>
+
+namespace util::cmd {
 
 class CmdArgs {
   public:
@@ -24,3 +26,5 @@ class CmdArgs {
 
     DataType m_data;
 };
+
+} // namespace util::cmd

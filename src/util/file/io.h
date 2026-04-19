@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/result/result.h"
+#include "util/common_types/result/result.h"
 
 #include <algorithm>
 #include <fstream>
