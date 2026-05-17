@@ -4,7 +4,8 @@
 
 namespace util::cmd {
 
-CmdArgs CmdArgs::from_space_delimited(int argc, char* argv[]) { // NOLINT
+CmdArgs CmdArgs::from_space_delimited(std::size_t argc,
+                                      char* argv[]) { // NOLINT
     DataType data;
 
     for (std::size_t i = 1; i < argc; i++) {
@@ -31,7 +32,8 @@ CmdArgs CmdArgs::from_space_delimited(int argc, char* argv[]) { // NOLINT
     return CmdArgs(std::move(data));
 }
 
-CmdArgs CmdArgs::from_equals_delimited(int argc, char* argv[]) { // NOLINT
+CmdArgs CmdArgs::from_equals_delimited(std::size_t argc,
+                                       char* argv[]) { // NOLINT
     DataType data;
 
     for (std::size_t i = 1; i < argc; i++) {

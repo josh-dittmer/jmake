@@ -1,6 +1,3 @@
 {
-    "opt2": "val2",
-    "nested": {
-        "anotha.opt3": 3
-    }
+    "m_opt1": "val1"
 }

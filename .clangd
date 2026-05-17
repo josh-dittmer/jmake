@@ -1,6 +1,8 @@
-If:
-  PathMatch: old/.*
-Index:
-  Background: Skip
-Diagnostics:
-  Suppress: '*'
+CompileFlags:
+  Remove:
+    - -freflection
+  Add:
+    - -freflection-latest 
+    - -fattribute-reflection 
+    - -ferror-limit=100
+  Compiler: /opt/clang-p2996/bin/clang

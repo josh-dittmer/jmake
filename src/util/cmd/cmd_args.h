@@ -14,8 +14,10 @@ class CmdArgs {
     // stores args like this: arg: value?
     using DataType = std::map<std::string, ValueType>;
 
-    static CmdArgs from_space_delimited(int argc, char* argv[]);  // NOLINT
-    static CmdArgs from_equals_delimited(int argc, char* argv[]); // NOLINT
+    static CmdArgs from_space_delimited(std::size_t argc,
+                                        char* argv[]); // NOLINT
+    static CmdArgs from_equals_delimited(std::size_t argc,
+                                         char* argv[]); // NOLINT
 
     Opt<ValueType> pop(const std::string& key);
 

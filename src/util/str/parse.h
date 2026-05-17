@@ -30,9 +30,7 @@ template <typename T> struct Parser<std::optional<T>> {
 };
 
 template <> struct Parser<std::string> {
-    static Result<std::string> parse(std::string str) {
-        return ok(std::move(str));
-    }
+    static Result<std::string> parse(std::string str) { return std::move(str); }
 };
 
 template <std::integral T>

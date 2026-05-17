@@ -21,6 +21,7 @@ Checks: >
   -modernize-use-nodiscard,
   -portability-avoid-pragma-once,
   -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
   -misc-non-private-member-variables-in-classes,
   -readability-named-parameter,
   -hicpp-named-parameter,

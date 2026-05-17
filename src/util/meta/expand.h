@@ -1,16 +1,14 @@
 #pragma once
 
 #include <meta>
-#include <utility>
 
 namespace util::meta {
 
 namespace detail {
 
 template <auto... Values> struct replicator_type {
-    template <typename F>
-    constexpr auto operator>>(F body) const -> decltype(auto) {
-        return std::forward<F>(body).template operator()<Values...>();
+    template <typename F> constexpr void operator>>(F body) const {
+        (body.template operator()<Values>(), ...);
     }
 };
 

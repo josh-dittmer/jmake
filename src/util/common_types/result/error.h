@@ -1,46 +1,37 @@
 #pragma once
 
-#include "util/common_types/result/result_initializer.h"
-
 #include <format>
 #include <source_location>
+#include <string>
 #include <vector>
+
+namespace detail {
+
+using ErrorBacktrace = std::vector<std::source_location>;
+
+} // namespace detail
 
 template <typename T> struct ErrorInitializer {
     T m_data;
-    std::source_location m_location;
+    detail::ErrorBacktrace m_bt;
 };
 
 template <typename T = std::string> class Error {
   public:
     template <typename V>
-    constexpr explicit Error(ErrorInitializer<V> initializer)
-        : Error(T{std::move(initializer.m_data)},
-                std::move(initializer.m_location)) {}
-
-    constexpr Error(T&& data, std::source_location location)
-        : m_data(std::move(data)) {
-        m_backtrace.emplace_back(location);
-    }
-
-    constexpr Error(Error&& error, std::source_location location)
-        : Error(std::move(error)) {
-        m_backtrace.emplace_back(location);
-    }
-
-    constexpr Error(Error&&) = default;
-    Error(Error&) = delete;
-    Error(const Error&) = delete;
-    Error& operator=(const Error&) = delete;
-    Error& operator=(Error&&) = default;
-
-    ~Error() = default;
+    Error(ErrorInitializer<V> initializer) // NOLINT
+        : m_data(std::move(initializer.m_data)),
+          m_bt(std::move(initializer.m_bt)) {}
 
     constexpr T& get() { return m_data; }
+    constexpr const T& get() const { return m_data; }
+
+    constexpr detail::ErrorBacktrace& get_bt() { return m_bt; }
+    constexpr const detail::ErrorBacktrace& get_bt() const { return m_bt; }
 
   private:
-    std::vector<std::source_location> m_backtrace;
     T m_data;
+    detail::ErrorBacktrace m_bt;
 
     friend struct std::formatter<Error<T>>;
 };
@@ -61,10 +52,5 @@ template <typename T> struct std::formatter<Error<T>> {
     constexpr auto format_min(const Error<T>& error,
                               std::format_context& ctx) const;
 };
-
-// error creation helper functions
-template <typename T>
-extern constexpr ResultInitializer<ErrorInitializer<T>, false>
-err(T value, std::source_location location = std::source_location::current());
 
 #include "error.tpp"

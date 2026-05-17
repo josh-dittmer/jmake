@@ -1,4 +1,4 @@
-FROM ubuntu:24.04 AS base
+FROM gcc:16.1 AS base
 LABEL Description="jmake development environment"
 
 # target architecture: X86 or AArch64
@@ -56,9 +56,6 @@ RUN apt -y update
 RUN apt install -y --no-install-recommends \
     git cmake
 
-ENV PATH=$INSTALL_DIR/bin:$PATH \
-    CC=$INSTALL_DIR/bin/clang \
-    CXX=$INSTALL_DIR/bin/clang++ \
-    LD_LIBRARY_PATH=$INSTALL_DIR/lib/$TARGET_TRIPLE
+ENV PATH=$INSTALL_DIR/bin:$PATH
 
 CMD ["sleep", "infinity"]

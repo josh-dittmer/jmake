@@ -2,8 +2,6 @@
 
 #include "source_location.h"
 
-#include <print>
-
 constexpr auto
 std::formatter<std::source_location>::parse(std::format_parse_context& ctx) {
     return ctx.begin();

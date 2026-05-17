@@ -17,7 +17,7 @@ inline Result<std::fstream> open(std::string_view path,
         return err(std::format("failed to open file '{}'", path));
     }
 
-    return ok(std::move(file));
+    return std::move(file);
 }
 
 template <typename T> inline Result<T> read(std::string_view path) {
@@ -29,11 +29,11 @@ template <typename T> inline Result<T> read(std::string_view path) {
                   "Container::value_type must be trivially copyable");
 
     auto open_res = open(path, std::ios::in | std::ios::binary);
-    if (!open_res.ok()) {
+    if (!open_res) {
         return err(open_res);
     }
 
-    auto& file = open_res.unwrap();
+    auto& file = *open_res;
 
     file.seekg(0, std::ios::end);
     const auto size = file.tellg();
@@ -57,7 +57,7 @@ template <typename T> inline Result<T> read(std::string_view path) {
             [](unsigned char ch) { return static_cast<value_type>(ch); });
     }
 
-    return Result<T>::Ok(std::move(buffer));
+    return std::move(buffer);
 }
 
 } // namespace util::file

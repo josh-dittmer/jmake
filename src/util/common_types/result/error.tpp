@@ -50,12 +50,11 @@ std::formatter<Error<T>>::format_trace(const Error<T>& error,
                                        std::format_context& ctx) const {
     auto out = std::format_to(ctx.out(), "\n\t[START CALLSTACK]");
 
-    for (int i = error.m_backtrace.size() - 1; i >= 1; i--) {
-        out =
-            std::format_to(out, "\n\t\t\342\224\234 {}", error.m_backtrace[i]);
+    for (int i = error.m_bt.size() - 1; i >= 1; i--) {
+        out = std::format_to(out, "\n\t\t\342\224\234 {}", error.m_bt[i]);
     }
 
-    out = std::format_to(out, "\n\t\t\342\224\224 {}", error.m_backtrace[0]);
+    out = std::format_to(out, "\n\t\t\342\224\224 {}", error.m_bt[0]);
 
     return std::format_to(out, " -> [{}]\n\t[END CALLSTACK]", error.m_data);
 }
@@ -64,8 +63,7 @@ template <typename T>
 constexpr auto
 std::formatter<Error<T>>::format_file(const Error<T>& error,
                                       std::format_context& ctx) const {
-    return std::format_to(ctx.out(), "{} -> [{}]", error.m_backtrace[0],
-                          error.m_data);
+    return std::format_to(ctx.out(), "{} -> [{}]", error.m_bt[0], error.m_data);
 }
 
 template <typename T>
@@ -73,10 +71,4 @@ constexpr auto
 std::formatter<Error<T>>::format_min(const Error<T>& error,
                                      std::format_context& ctx) const {
     return std::format_to(ctx.out(), "{}", error.m_data);
-}
-
-template <typename T>
-constexpr ResultInitializer<ErrorInitializer<T>, false>
-err(T value, std::source_location location) {
-    return bad(ErrorInitializer<T>{std::move(value), location});
 }
