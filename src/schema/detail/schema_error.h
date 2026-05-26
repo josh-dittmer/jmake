@@ -35,11 +35,11 @@ using Trace = std::variant<
 // clang-format on
 
 struct ErrorInfo {
-    ErrorInfo(std::string msg, std::vector<Trace> bt)
-        : m_msg(std::move(msg)), m_bt(std::move(bt)) {}
-
     explicit ErrorInfo(std::string msg) //
         : m_msg(std::move(msg)), m_bt({}) {}
+
+    explicit ErrorInfo(std::string msg, std::vector<Trace> bt)
+        : m_msg(std::move(msg)), m_bt(std::move(bt)) {}
 
     std::string m_msg;
     std::vector<Trace> m_bt;
@@ -47,17 +47,19 @@ struct ErrorInfo {
 
 using SchemaError = Error<ErrorInfo>;
 
-template <typename T> using SchemaResult = Result<T, SchemaError>;
+template <typename T = None> using SchemaResult = Result<T, SchemaError>;
+
+template <typename T>
+extern SchemaResult<T>& push_bt(SchemaResult<T>& result, Trace trace);
 
 } // namespace schema::detail
 
 // formatter for schema error
-template <> struct std::formatter<schema::detail::SchemaError> {
+template <> struct std::formatter<schema::detail::ErrorInfo> {
     static constexpr auto parse(std::format_parse_context& ctx);
 
-    static constexpr auto
-    format(const schema::detail::SchemaError& schema_error,
-           std::format_context& ctx);
+    static constexpr auto format(const schema::detail::ErrorInfo& error_info,
+                                 std::format_context& ctx);
 };
 
 #include "schema_error.tpp"

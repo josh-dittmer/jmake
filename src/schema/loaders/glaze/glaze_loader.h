@@ -1,35 +1,42 @@
 #pragma once
 
+#include "schema/object.h"
 #include "schema/tag.h"
 
 #include <glaze/glaze.hpp>
 
-#include <concepts>
+#include <meta>
 
-namespace schema {
+namespace schema::glz {
 
-struct json_id : string_tag {
+struct id : schema::string_tag {
     using string_tag::string_tag;
 };
 
-struct enable_glz {};
-
 namespace detail {
 
-template <std::meta::info R> //
-consteval auto create_glz_object();
+template <auto... Args>
+extern consteval decltype(::glz::object(Args...)) glz_object_pack();
+
+template <auto Mem> extern consteval auto field_key();
+template <typename In, auto Mem> extern consteval auto field_getter();
 
 } // namespace detail
+} // namespace schema::glz
 
-} // namespace schema
+// glz::meta specialization to enable field renaming w/ annotations for objects
+template <typename T> struct glz::meta<::schema::detail::in_object<T>> {
+  private:
+    static consteval auto create_glz_object();
+    static consteval auto create_args();
 
-// glz::meta specialization to enable field renaming w/ annotations
-// clang-format off
-template <typename T>
-    requires std::derived_from<T, schema::enable_glz>
-struct glz::meta<T> {
-    static constexpr auto modify = [:::schema::detail::create_glz_object<^^T>():];
+    template <std::meta::info Member> static consteval auto field_getter();
+
+  public:
+    using in_object_t = ::schema::detail::in_object<T>;
+    using data_t = in_object_t::data_type;
+
+    static constexpr auto value = create_glz_object();
 };
-// clang-format onw
 
 #include "glaze_loader.tpp"

@@ -1,35 +1,36 @@
 #pragma once
 
-#include "detail/in_type.h"
-#include "util/common_types/result/result.h"
+#include "detail/schema_error.h"
 
 #include <meta>
 
-namespace schema {
+namespace schema::detail {
 
-namespace detail {
+template <typename T> struct validator {
+    using type = T;
+
+    // clang-format off
+    template <
+        std::meta::info Member,
+        typename... Context
+    >
+    // clang-format on
+    static auto validate(const std::tuple<Context...>& context,
+                         const type& data) -> SchemaResult<>;
+};
+
+// default combiner simply overwrites
+template <typename T> struct combiner {
+    static void combine(T& base, const T& in) { base = in; }
+};
 
 template <typename T> struct in_type {
-    using type = T;
+  public:
+    using data_type = T;
+
+    static auto to_out(data_type in) -> SchemaResult<T>;
 };
 
-template <typename T> struct out_type {
-    using type = T;
-
-    static auto from_in_type(in_type<T> in_type) -> Result<type>;
-};
-
-} // namespace detail
-
-// clang-format off
-template <
-    std::meta::info Member, 
-    typename T,
-    typename... Context
->
-// clang-format on
-extern Result<detail::in_type<T>> load(T&& load_from, Context&&... context);
-
-} // namespace schema
+} // namespace schema::detail
 
 #include "generic_type.tpp"

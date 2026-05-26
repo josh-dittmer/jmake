@@ -3,36 +3,25 @@
 #include "generic_type.h"
 #include "schema/rule.h"
 
-namespace schema {
-
-namespace detail {
+namespace schema::detail {
 
 // clang-format off
 template <typename T>
-auto out_type<T>::from_in_type(in_type<T> in_type) -> Result<T>
-// clang-format on
-{
-    return std::move(in_type);
-}
-
-} // namespace detail
-
-// clang-format off
 template <
-    std::meta::info Member, 
-    typename T,
+    std::meta::info Member,
     typename... Context
 >
 // clang-format on
-Result<detail::in_type<T>> load(T&& load_from, Context&&... context) {
-    auto rule_res = rules_satisfied<Member>(std::forward<T>(load_from),
-                                            std::forward<Context>(context)...);
+auto validator<T>::validate(const std::tuple<Context...>& context,
+                            const type& data) -> SchemaResult<> {
+    // make sure all rules are satisfied
+    HUH(rules_satisfied<Member>(context, data));
 
-    if (!rule_res) {
-        return err(rule_res);
-    }
-
-    return load_from;
+    return ok();
 }
 
-} // namespace schema
+template <typename T> auto in_type<T>::to_out(data_type in) -> SchemaResult<T> {
+    return in;
+}
+
+} // namespace schema::detail

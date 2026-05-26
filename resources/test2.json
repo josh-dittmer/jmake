@@ -1,3 +1,10 @@
 {
-    "nested.opt1": "val1"
+    "123": "val2",
+    "m_opt3": [1, 2, 3],
+    "m_opt2": 5,
+    "m_nested": {
+        "test_rename": "a test value first",
+        "m_nested_3": [8, 8]
+    },
+    "m_opt4": "test"
 }

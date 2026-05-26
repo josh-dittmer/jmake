@@ -6,6 +6,6 @@ namespace schema::detail {
 
 template <typename T> struct in_type;
 
-template <typename T> using in_data_t = in_type<T>::type;
+template <typename T> using in_data_t = in_type<T>::data_type;
 
 } // namespace schema::detail

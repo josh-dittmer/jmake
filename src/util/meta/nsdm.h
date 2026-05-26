@@ -13,4 +13,8 @@ consteval auto num_nsdm(std::meta::info info) -> std::size_t {
     return nsdm_of(info).size();
 }
 
+consteval auto nsdm_arr(std::meta::info info) -> auto {
+    return std::define_static_array(nsdm_of(info));
+}
+
 } // namespace util::meta

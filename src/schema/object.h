@@ -1,29 +1,32 @@
 #pragma once
 
+#include "detail/combiner.h"
 #include "detail/in_type.h"
+#include "detail/schema_error.h"
+#include "detail/validator.h"
 
-#include "util/common_types/result/result.h"
-#include "util/meta/nsdm.h"
+#include "util/meta/nsdm.h" // IWYU pragma: keep
 
-#include <meta>
+#include <concepts>
 #include <type_traits>
 
 namespace schema {
 
 namespace detail {
 
-// template <typename T, auto... As> //
-// using Property[[= 1]] = std::optional<T>;
-
-// clang-format off
-template <
-    typename T, 
-    std::meta::info... As
-> 
+template <std::meta::info OutMember> //
 struct Property {
-    int m_data;
+  public:
+    constexpr static auto member = OutMember;
+    using type = [:std::meta::type_of(OutMember):];
+    using data_type = in_data_t<type>;
+
+    auto& get() { return m_data; }
+    const auto& get() const { return m_data; }
+
+  private:
+    std::optional<data_type> m_data;
 };
-// clang-format on
 
 // clang-format off
 template <
@@ -31,43 +34,57 @@ template <
     std::meta::info Object
 >
 // clang-format on
-extern consteval auto create_in_type();
+extern consteval auto create_object_in_type();
+
+template <typename T> struct in_object {
+    struct data;
+    consteval { create_object_in_type<^^data, ^^T>(); }
+
+    using data_type = data;
+
+    data_type m_data;
+};
+
+template <typename T> struct validator<in_object<T>> {
+    using type = in_object<T>;
+
+    // clang-format off
+    template <
+        std::meta::info,
+        typename... Context
+    >
+    // clang-format on
+    static auto validate(const std::tuple<Context...>& context,
+                         const type& data) -> SchemaResult<>;
+};
+
+template <typename T> struct combiner<in_object<T>> {
+    using type = in_object<T>;
+
+    static void combine(type& base, const type& in);
+};
 
 template <typename T>
-    requires std::is_class_v<T>
+    requires std::is_aggregate_v<T>
 struct in_type<T> {
-    struct data;
-    consteval { create_in_type<^^data, ^^T>(); }
+  public:
+    using data_type = in_object<T>;
 
-    using type = data;
-
-    // for short-circuiting
-    static constexpr std::size_t size = util::meta::num_nsdm(^^data);
-    std::size_t m_num_set;
-
-    // safely tie members to original Object members
-    static consteval auto tie();
+    static auto to_out(data_type in) -> SchemaResult<T>;
 };
 
 } // namespace detail
 
 // clang-format off
 template <
-    typename Object,
     typename... Context,
+    typename T,
     typename... Ts
-> requires std::is_class_v<Object>
+>
 // clang-format on
-extern Result<detail::in_type<Object>>
-load(const std::tuple<Context...>& context, Ts&&... load_from);
-
-// clang-format off
-template <
-typename Object,
-typename... Ts
-> requires std::is_class_v<Object>
-// clang-format on
-extern Result<detail::in_type<Object>> load(Ts&&... load_from);
+extern detail::SchemaResult<T> load(const std::tuple<Context...>& context,
+                                    detail::in_object<T> in1, Ts&&... rest)
+    requires(std::convertible_to<Ts, detail::in_object<T>> && ...);
 
 } // namespace schema
 

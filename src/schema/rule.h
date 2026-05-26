@@ -25,11 +25,12 @@ template <typename T> struct range {
 // clang-format off
 template <
     std::meta::info Member,
-    typename T,
-    typename... Context
+    typename... Context,
+    typename T
 >
 // clang-format on
-extern Result<> rules_satisfied(T&& data, Context&&... context);
+extern Result<> rules_satisfied(const std::tuple<Context...>& context,
+                                const T& data);
 
 } // namespace schema
 

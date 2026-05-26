@@ -6,6 +6,14 @@
 #include <expected>
 #include <source_location>
 
+#define HUH(expr)                                                              \
+    ({                                                                         \
+        auto&& res = (expr);                                                   \
+        if (!res.has_value())                                                  \
+            return err(res);                                                   \
+        std::move(res.value());                                                \
+    })
+
 template <typename T = None, typename E = Error<>>
 using Result = std::expected<T, E>;
 

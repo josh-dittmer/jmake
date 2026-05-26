@@ -1,3 +1,19 @@
 {
-    "m_opt1": "val1"
+    "m_opt3": [1, 2, 2, 2, 1],
+    "m_nested": {
+        "test_rename": "a test value second",
+        "m_nested_2": 6,
+        "m_nested_3": [6, 7]
+    },
+    "m_obj_array": [
+        {
+            "test_rename": 1
+        },
+        {
+            "test_rename": 2
+        },
+        {
+            "test_rename": 3
+        }
+    ]
 }

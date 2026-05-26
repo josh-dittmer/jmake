@@ -2,15 +2,14 @@
 
 #include "object.h"
 
-#include "schema/detail/in_type.h"
-#include "schema/rule.h"
-#include "util/meta/expand.h"
-#include "util/meta/nsdm.h"
+#include "array.h"        // IWYU pragma: keep
+#include "context.h"      // IWYU pragma: keep
+#include "generic_type.h" // IWYU pragma: keep
+
+#include "detail/combiner.h"
+#include "schema/detail/schema_error.h"
 
 #include <meta>
-#include <optional>
-#include <print>
-#include <ranges>
 
 namespace schema {
 
@@ -21,121 +20,192 @@ template <
     std::meta::info ClassType, 
     std::meta::info Object
 >
-// clang-format off
-consteval auto create_in_type() {
+// clang-format on
+consteval auto create_object_in_type() {
     std::vector<std::meta::info> mem_specs;
 
-    // clang-format off
-    [: util::meta::expand(util::meta::nsdm_of(Object)) :] >> [&]<auto member> {        
-        using m_type [[maybe_unused]] = [: std::meta::type_of(member) :];
-
-        auto mem_anns = std::meta::annotations_of(member);
-
+    template for (constexpr auto mem : util::meta::nsdm_arr(Object)) {
         std::vector<std::meta::info> prop_args;
-        prop_args.push_back(^^m_type);
+        prop_args.push_back(^^mem); // reflection of a reflection
 
-        // append annotations
-        for (auto a : mem_anns) {
-            prop_args.push_back(std::meta::reflect_constant(a));
-        }
-
+        // clang-format off
         mem_specs.push_back(std::meta::data_member_spec(
             std::meta::substitute(^^Property, prop_args),
-            { .name = std::meta::identifier_of(member) }
+            { .name = std::meta::identifier_of(mem) }
         ));
-    };
-    // clang-format on
+        // clang-format on
+    }
 
     return std::meta::define_aggregate(ClassType, mem_specs);
 }
 
+// clang-format off
 template <typename T>
-    requires std::is_class_v<T>
-consteval auto in_type<T>::tie() {
-    // TODO: remove [[maybe_unused]] when compiler bug is fixed
-    using data_t [[maybe_unused]] = in_type<T>::type;
+template <
+    std::meta::info,
+    typename... Context
+>
+// clang-format on
+auto validator<in_object<T>>::validate(const std::tuple<Context...>& context,
+                                       const type& data) -> SchemaResult<> {
+    using data_t [[maybe_unused]] = type::data_type;
 
-    std::vector<std::pair<std::meta::info, std::meta::info>> members;
+    template for (constexpr auto mem : util::meta::nsdm_arr(^^data_t)) {
+        // get member type (Property<...>)
+        using p_t = [:std::meta::type_of(mem):];
+        using pd_t = p_t::data_type;
 
-    for (auto [m1, m2] : std::views::zip(util::meta::nsdm_of(^^T),
-                                         util::meta::nsdm_of(^^data_t))) {
-        members.emplace_back(m1, m2);
+        constexpr auto out_member = p_t::member;
+
+        const auto& value_opt = data.m_data.[:mem:].get();
+
+        // if no value, skip
+        if (!value_opt) {
+            continue;
+        }
+
+        const auto& value = *value_opt;
+
+        // validate the property
+        auto val_res =
+            validator<pd_t>::template validate<out_member>(context, value);
+
+        if (!val_res) {
+            // validation failed? trace the property
+            constexpr auto prop_id = std::meta::identifier_of(out_member);
+
+            push_bt(val_res, ObjectTrace{});
+            push_bt(val_res, PropertyTrace{std::string{prop_id}});
+
+            return err(val_res);
+        }
     }
 
-    return members;
+    return ok();
+}
+
+template <typename T>
+void combiner<in_object<T>>::combine(type& base, const type& in) {
+    using body_t [[maybe_unused]] = type::data_type;
+
+    template for (constexpr auto mem : util::meta::nsdm_arr(^^body_t)) {
+        // get member type (Property<...>)
+        using p_t = [:std::meta::type_of(mem):];
+        using pd_t = p_t::data_type;
+
+        const auto& in_value_opt = in.m_data.[:mem:].get();
+        auto& base_value_opt = base.m_data.[:mem:].get();
+
+        // if no value, skip
+        if (!in_value_opt) {
+            continue;
+        }
+
+        const auto& in_value = *in_value_opt;
+
+        // first value? set base
+        if (!base_value_opt) {
+            base_value_opt = std::move(in_value);
+        }
+
+        // otherwise, combine with previous
+        else {
+            combiner<pd_t>::combine(*base_value_opt, in_value);
+        }
+    }
+}
+
+template <typename T>
+    requires std::is_aggregate_v<T>
+auto in_type<T>::to_out(data_type in) -> SchemaResult<T> {
+    using body_t [[maybe_unused]] = data_type::data_type;
+
+    T output{};
+
+    template for (constexpr auto mem : util::meta::nsdm_arr(^^body_t)) {
+        // get member type (Property<...>)
+        using p_t = [:std::meta::type_of(mem):];
+        using po_t = p_t::type;
+
+        constexpr auto out_mem = p_t::member;
+        constexpr auto prop_id = std::meta::identifier_of(out_mem);
+
+        constexpr bool has_default =
+            std::meta::has_default_member_initializer(out_mem);
+
+        constexpr bool is_optional =
+            std::meta::has_template_arguments(std::meta::type_of(out_mem)) &&
+            std::meta::template_of(std::meta::type_of(out_mem)) ==
+                ^^std::optional;
+
+        auto& value_opt = in.m_data.[:mem:].get();
+
+        // check for value
+        if (!value_opt) {
+            // if default exists or is optional, continue
+            if constexpr (has_default || is_optional) {
+                continue;
+            }
+
+            // otherwise error out
+            else {
+                return err(ErrorInfo(
+                    "missing required value",
+                    {ObjectTrace{}, PropertyTrace{std::string{prop_id}}}));
+            }
+        }
+
+        auto& value = *value_opt;
+
+        // recursively convert to output type
+        auto out_res = in_type<po_t>::to_out(std::move(value));
+        if (!out_res) {
+            // trace the property
+            push_bt(out_res, ObjectTrace{});
+            push_bt(out_res, PropertyTrace{std::string{prop_id}});
+
+            return err(out_res);
+        }
+
+        output.[:out_mem:] = std::move(*out_res);
+    }
+
+    return output;
 }
 
 } // namespace detail
 
 // clang-format off
 template <
-    typename Object,
     typename... Context,
+    typename T,
     typename... Ts
-> requires std::is_class_v<Object>
+>
 // clang-format on
-Result<detail::in_type<Object>> //
-load(const std::tuple<Context...>& context, Ts&&... load_from) {
-    // template for (auto&& l : {load_from...}) { // NOLINT
-    //     std::println("{}", l);
-    //     std::println("{}", l);
-    // }
+detail::SchemaResult<T> load(const std::tuple<Context...>& context,
+                             detail::in_object<T> in1,
+                             Ts&&... rest) // NOLINT
+    requires(std::convertible_to<Ts, detail::in_object<T>> && ...)
+{
+    using namespace detail;
 
-    using in_t = detail::in_type<Object>;
-    using in_data_t [[maybe_unused]] = in_t::type;
+    using data_t = detail::in_object<T>;
+    constexpr auto null_refl = std::meta::info{};
 
-    // initialize empty result
-    auto output = in_t{};
+    // validate first input
+    HUH(validator<data_t>::template validate<null_refl>(context, in1));
 
-    // for error checking
-    Result<> result = ok();
+    // merge in the rest of the inputs
+    template for (auto&& l : {std::forward<Ts>(rest)...}) {
+        // validate input
+        HUH(validator<data_t>::template validate<null_refl>(context, l));
 
-    // clang-format off
-    [: util::meta::expand(util::meta::nsdm_of(^^in_data_t)) :] >> [&]<auto member> {
-        /*if (!result) {
-            return;
-        }*/
-
-        std::println("{}:", std::meta::display_string_of(std::meta::type_of(member)));
-
-        /*[: util::meta::expand(std::meta::annotations_of(member)) :] >> [&]<auto ann> {
-            constexpr auto a_info = std::meta::type_of(ann);
-            std::println("\t{}", std::meta::identifier_of(a_info));
-        };*/
-        
-        // load each property
-        /*auto load_res = load<og_mem, in_mem>(
-            context,
-            std::forward<Ts>(load_from)...
-        );
-
-        // check result
-        if (!load_res) {
-            result = err(load_res);
-        }
-
-        // all is good? assign
-        output.[: in_mem :] = std::move(*load_res);*/
-    };
-    // clang-format on
-
-    if (!result) {
-        return err(result);
+        // merge it into first input
+        combiner<data_t>::combine(in1, l);
     }
 
-    // make sure object itself is valid
-
-    return output;
-}
-
-// clang-format off
-template <
-typename Object,
-typename... Ts
-> requires std::is_class_v<Object>
-// clang-format on
-Result<detail::in_type<Object>> load(Ts&&... load_from) {
-    return load<Object>({}, std::forward<Ts>(load_from)...);
+    //  convert to out type and return
+    return HUH(in_type<T>::to_out(std::move(in1)));
 }
 
 } // namespace schema

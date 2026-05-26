@@ -3,40 +3,34 @@
 #include "rule.h"
 
 #include "schema/tag.h"
-#include "util/meta/expand.h"
+#include "util/meta/annotation.h" // IWYU pragma: keep
+
+#include <meta>
 
 namespace schema {
 
 // clang-format off
 template <
     std::meta::info Member,
-    typename T,
-    typename... Context
+    typename... Context,
+    typename T
 >
 // clang-format on
-Result<> rules_satisfied(T&& data, Context&&... context) {
-    Result<> result = ok();
-
-    // clang-format off
-    [: util::meta::expand(std::meta::annotations_of(Member)) :] >> [&]<auto ann> {
-        if (!result) {
-            return;
-        }
-
-        auto tag_val = tag_from_annotation<ann>(std::forward<Context>(context)...);
+Result<> rules_satisfied(const std::tuple<Context...>& context, const T& data) {
+    template for (constexpr auto a : util::meta::ann_arr(Member)) {
+        auto tag_val = tag_from_annotation<a>(context);
         using tag_type = decltype(tag_val);
 
-        constexpr bool is_rule = requires(tag_type tag) {{
-            tag_val.rule(std::forward<T>(data)) 
-        } -> std::same_as<Result<>>; };
+        constexpr bool is_rule = requires(tag_type tag) {
+            { tag_val.rule(data) } -> std::same_as<Result<>>;
+        };
 
         if constexpr (is_rule) {
-            result = tag_val.rule(std::forward<T>(data));
+            HUH(tag_val.rule(data));
         }
-    };
-    // clang-format on
+    }
 
-    return result;
+    return ok();
 }
 
 } // namespace schema

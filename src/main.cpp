@@ -1,24 +1,22 @@
-#include "schema/rule.h"
-#include "schema/tag.h"
+#include "schema/loaders/glaze/glaze_loader.h"
+#include "schema/object.h"
 #include "util/file/io.h"
+#include "util/str/formatters/optional.h"
+#include "util/str/formatters/universal.h"
 
 #include <glaze/glaze.hpp>
 
 #include <meta>
 #include <print>
+#include <type_traits>
 
-using namespace schema;
 using namespace std::string_view_literals;
 
-struct json_id : string_tag {
+struct cmd_id : schema::string_tag {
     using string_tag::string_tag;
 };
 
-struct cmd_id : string_tag {
-    using string_tag::string_tag;
-};
-
-struct help_str : string_tag {
+struct help_str : schema::string_tag {
     using string_tag::string_tag;
 };
 
@@ -44,74 +42,89 @@ struct ExampleRegistry {
     }
 };
 
+struct Parent {
+    std::string m_test;
+};
+
 // clang-format off
-struct Test {
-    [[= json_id("123"sv), = cmd_id("--cmd-id"sv) ]]
-    [[= rt(ExampleRegistry::get_help_str(Key::OPT1)) ]]
-    std::string m_opt1;
-
-    [[= range(1, 10) ]]
-    int m_opt2;
-
-    int m_opt3;
+struct Test2 {
+    [[= schema::glz::id("test_rename"sv) ]]
+    [[= schema::range(1, 5) ]]
+    int m_field;
 };
 // clang-format on
 
-int main() {
-    auto file_res = util::file::read<std::string>("./resources/test1.json");
-    if (!file_res) {
-        std::println("Error: {:t}", file_res.error());
-        return -1;
-    }
+// clang-format off
+struct Test {
+    [[= schema::glz::id("123"sv), = cmd_id("--cmd-id"sv) ]]
+    std::string m_opt1;
 
-    const auto& file = *file_res;
+    [[= schema::range(1, 10) ]]
+    int m_opt2;
 
-    auto json_res = glz::read_json<Test>(file);
+    [[= schema::range(1, 5) ]]
+    std::vector<int> m_opt3;
+
+    std::optional<std::string> m_opt4;
+
+    struct Nested {
+        [[= schema::glz::id("test_rename"sv) ]]
+        std::string m_nested_1;
+
+        [[= schema::range(1, 10) ]]
+        int m_nested_2 = 5;
+
+        [[= schema::range(1, 8)]]
+        std::vector<int> m_nested_3;
+    } m_nested;
+
+    std::vector<Test2> m_obj_array;
+};
+// clang-format on
+
+template <> struct std::formatter<Test2> : universal_formatter<Test2> {};
+
+template <typename T>
+    requires std::is_aggregate_v<T>
+struct std::formatter<T> : universal_formatter<T> {};
+
+using in_t = schema::detail::in_type<Test>;
+using in_object_t = schema::detail::in_object<Test>;
+
+namespace {
+
+Result<in_object_t> read_test(std::string_view path) {
+    const auto& file = HUH(util::file::read<std::string>(path));
+
+    auto json_res = glz::read_json<in_object_t>(file);
     if (!json_res) {
-        std::println("Error: {}", glz::format_error(json_res, file));
+        return err(glz::format_error(json_res.error()));
+    }
+
+    return *json_res;
+}
+
+void print_test(const Test& test) { std::println("{}", test); }
+
+schema::detail::SchemaResult<> load_tests() {
+    auto test1 = HUH(read_test("./resources/test1.json"));
+    auto test2 = HUH(read_test("./resources/test2.json"));
+
+    auto test_loaded = HUH(schema::load(schema::context(), test2, test1));
+
+    print_test(test_loaded);
+
+    return ok();
+}
+
+} // namespace
+
+int main() {
+    auto test_res = load_tests();
+    if (!test_res) {
+        std::println("Error: {}", test_res.error());
         return -1;
     }
-
-    const auto& test = *json_res;
-
-    std::println("m_opt1: {}", test.m_opt1);
-    std::println("m_opt2: {}", test.m_opt2);
-
-    // auto test1 = schema::load<Test>(test);
-
-    // clang-format off
-
-    // const auto& test2 = *test1;
-
-    /*ExampleContext c{.m_lang = ExampleContext::Language::ENGLISH};
-
-    constexpr auto test1 = get_tag<^^Test::m_opt1, json_id>();
-    if constexpr (test1) {
-        std::println("Value: {}", test1->m_str);
-    } else {
-        std::println("Value: none");
-    }
-
-    auto test2 = get_tag<^^Test::m_opt1, cmd_id>();
-    if (test2) {
-        std::println("Value: {}", test2->m_str);
-    } else {
-        std::println("Value: none");
-    }
-
-    auto test3 = get_tag<^^Test::m_opt1, help_str>(c);
-    if (test3) {
-        std::println("Value: {}", test3->m_str);
-    } else {
-        std::println("Value: none");
-    }
-
-    auto test4 = schema::load<Test>(3, c);
-    if (test4) {
-        std::println("yes");
-    } else {
-        std::println("Error: {}", test4.error());
-    }*/
 
     return 0;
 }
