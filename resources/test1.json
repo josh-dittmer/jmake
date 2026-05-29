@@ -13,7 +13,12 @@
             "test_rename": 2
         },
         {
-            "test_rename": 3
+            "test_rename": 3,
+            "m_field2": [4, 5, 6]
         }
-    ]
+    ],
+    "m_opt4": {
+        "test_rename": 2,
+        "m_field2": [4, 5, 6]
+    }
 }

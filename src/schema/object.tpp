@@ -5,6 +5,7 @@
 #include "array.h"        // IWYU pragma: keep
 #include "context.h"      // IWYU pragma: keep
 #include "generic_type.h" // IWYU pragma: keep
+#include "optional.h"     // IWYU pragma: keep
 
 #include "detail/combiner.h"
 #include "schema/detail/schema_error.h"
@@ -116,7 +117,7 @@ void combiner<in_object<T>>::combine(type& base, const type& in) {
 }
 
 template <typename T>
-    requires std::is_aggregate_v<T>
+    requires std::is_class_v<T>
 auto in_type<T>::to_out(data_type in) -> SchemaResult<T> {
     using body_t [[maybe_unused]] = data_type::data_type;
 
@@ -167,6 +168,7 @@ auto in_type<T>::to_out(data_type in) -> SchemaResult<T> {
             return err(out_res);
         }
 
+        // set output member
         output.[:out_mem:] = std::move(*out_res);
     }
 

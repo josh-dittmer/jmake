@@ -1,7 +1,7 @@
 #include "schema/loaders/glaze/glaze_loader.h"
 #include "schema/object.h"
 #include "util/file/io.h"
-#include "util/str/formatters/optional.h"
+#include "util/str/formatters/optional.h" // IWYU pragma: keep
 #include "util/str/formatters/universal.h"
 
 #include <glaze/glaze.hpp>
@@ -51,6 +51,8 @@ struct Test2 {
     [[= schema::glz::id("test_rename"sv) ]]
     [[= schema::range(1, 5) ]]
     int m_field;
+
+    std::optional<std::vector<int>> m_field2;
 };
 // clang-format on
 
@@ -65,7 +67,7 @@ struct Test {
     [[= schema::range(1, 5) ]]
     std::vector<int> m_opt3;
 
-    std::optional<std::string> m_opt4;
+    std::optional<Test2> m_opt4;
 
     struct Nested {
         [[= schema::glz::id("test_rename"sv) ]]
@@ -81,8 +83,6 @@ struct Test {
     std::vector<Test2> m_obj_array;
 };
 // clang-format on
-
-template <> struct std::formatter<Test2> : universal_formatter<Test2> {};
 
 template <typename T>
     requires std::is_aggregate_v<T>
@@ -104,7 +104,7 @@ Result<in_object_t> read_test(std::string_view path) {
     return *json_res;
 }
 
-void print_test(const Test& test) { std::println("{}", test); }
+void print_test(const Test& test) { std::println("{:n}", test); }
 
 schema::detail::SchemaResult<> load_tests() {
     auto test1 = HUH(read_test("./resources/test1.json"));

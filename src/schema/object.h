@@ -65,7 +65,7 @@ template <typename T> struct combiner<in_object<T>> {
 };
 
 template <typename T>
-    requires std::is_aggregate_v<T>
+    requires std::is_class_v<T>
 struct in_type<T> {
   public:
     using data_type = in_object<T>;
