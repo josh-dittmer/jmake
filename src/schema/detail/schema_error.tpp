@@ -40,5 +40,9 @@ constexpr auto std::formatter<schema::detail::ErrorInfo>::format(
         // clang-format on
     }
 
-    return std::format_to(ctx.out(), ": {}", error_info.m_msg);
+    if (!error_info.m_bt.empty()) {
+        out = std::format_to(out, ": ");
+    }
+
+    return std::format_to(out, "{}", error_info.m_msg);
 }

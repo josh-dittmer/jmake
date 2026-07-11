@@ -8,25 +8,12 @@
 #include "util/meta/nsdm.h" // IWYU pragma: keep
 
 #include <concepts>
+#include <meta>
 #include <type_traits>
 
 namespace schema {
 
 namespace detail {
-
-template <std::meta::info OutMember> //
-struct Property {
-  public:
-    constexpr static auto member = OutMember;
-    using type = [:std::meta::type_of(OutMember):];
-    using data_type = in_data_t<type>;
-
-    auto& get() { return m_data; }
-    const auto& get() const { return m_data; }
-
-  private:
-    std::optional<data_type> m_data;
-};
 
 // clang-format off
 template <
@@ -36,11 +23,22 @@ template <
 // clang-format on
 extern consteval auto create_object_in_type();
 
-template <typename T> struct in_object {
+// clang-format off
+template <typename T>
+// clang-format on
+struct in_object {
     struct data;
     consteval { create_object_in_type<^^data, ^^T>(); }
 
     using data_type = data;
+
+    // pair: {constant array, member}
+    using flat_pair = std::pair<std::meta::info, std::meta::info>;
+
+    static consteval auto flatten();
+
+    template <std::meta::info... Path> //
+    static consteval auto flatten_impl();
 
     data_type m_data;
 };
@@ -84,6 +82,15 @@ template <
 // clang-format on
 extern detail::SchemaResult<T> load(const std::tuple<Context...>& context,
                                     detail::in_object<T> in1, Ts&&... rest)
+    requires(std::convertible_to<Ts, detail::in_object<T>> && ...);
+
+// clang-format off
+template <
+    typename T,
+    typename... Ts
+>
+// clang-format on
+extern detail::SchemaResult<T> load(detail::in_object<T> in1, Ts&&... rest)
     requires(std::convertible_to<Ts, detail::in_object<T>> && ...);
 
 } // namespace schema

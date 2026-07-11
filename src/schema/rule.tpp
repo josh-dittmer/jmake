@@ -18,7 +18,12 @@ template <
 // clang-format on
 Result<> rules_satisfied(const std::tuple<Context...>& context, const T& data) {
     template for (constexpr auto a : util::meta::ann_arr(Member)) {
-        auto tag_val = tag_from_annotation<a>(context);
+        auto tag_val = std::apply(
+            [](const Context&... args) {
+                return tag_from_annotation<a>(args...);
+            },
+            context);
+
         using tag_type = decltype(tag_val);
 
         constexpr bool is_rule = requires(tag_type tag) {

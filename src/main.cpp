@@ -1,5 +1,7 @@
+#include "schema/loaders/cmd/cmd_loader.h"
 #include "schema/loaders/glaze/glaze_loader.h"
 #include "schema/object.h"
+#include "util/cmd/cmd_args.h"
 #include "util/file/io.h"
 #include "util/str/formatters/optional.h" // IWYU pragma: keep
 #include "util/str/formatters/universal.h"
@@ -11,10 +13,6 @@
 #include <type_traits>
 
 using namespace std::string_view_literals;
-
-struct cmd_id : schema::string_tag {
-    using string_tag::string_tag;
-};
 
 struct help_str : schema::string_tag {
     using string_tag::string_tag;
@@ -33,9 +31,9 @@ struct ExampleRegistry {
             return [](ExampleContext context) -> help_str {
                 switch (context.m_lang) {
                 case ExampleContext::Language::ENGLISH:
-                    return "Runtime-dependent";
+                    return "Runtime-dependent"sv;
                 case ExampleContext::Language::SPANISH:
-                    return "Dependiente del tiempo de ejecución";
+                    return "Dependiente del tiempo de ejecución"sv;
                 }
             };
         };
@@ -48,8 +46,8 @@ struct Parent {
 
 // clang-format off
 struct Test2 {
-    [[= schema::glz::id("test_rename"sv) ]]
-    [[= schema::range(1, 5) ]]
+    [[= schema::glz::rename("test_rename") ]]
+    [[= schema::range(1, 5)                ]]
     int m_field;
 
     std::optional<std::vector<int>> m_field2;
@@ -58,10 +56,12 @@ struct Test2 {
 
 // clang-format off
 struct Test {
-    [[= schema::glz::id("123"sv), = cmd_id("--cmd-id"sv) ]]
+    [[= schema::glz::rename("123")   ]]
+    [[= schema::cmd::rename("--opt1")]]
     std::string m_opt1;
 
-    [[= schema::range(1, 10) ]]
+    [[= schema::range(1, 10)   ]]
+    [[= schema::cmd::disable{} ]]
     int m_opt2;
 
     [[= schema::range(1, 5) ]]
@@ -70,17 +70,25 @@ struct Test {
     std::optional<Test2> m_opt4;
 
     struct Nested {
-        [[= schema::glz::id("test_rename"sv) ]]
-        std::string m_nested_1;
+        [[= schema::glz::rename("test_rename") ]]
+        std::string m_nested_1 = "none";
 
+        [[= schema::cmd::rename("--nested2") ]]
         [[= schema::range(1, 10) ]]
         int m_nested_2 = 5;
 
-        [[= schema::range(1, 8)]]
-        std::vector<int> m_nested_3;
+        [[= schema::range(1, 20)]]
+        std::optional<std::vector<int>> m_nested_3;
+
+        struct DoubleNest {
+            [[= schema::cmd::rename("--nested3")]]
+            std::string m_dn_1;
+        } m_nest2;
     } m_nested;
 
     std::vector<Test2> m_obj_array;
+
+    int m_visible = 69;
 };
 // clang-format on
 
@@ -106,11 +114,12 @@ Result<in_object_t> read_test(std::string_view path) {
 
 void print_test(const Test& test) { std::println("{:n}", test); }
 
-schema::detail::SchemaResult<> load_tests() {
+schema::detail::SchemaResult<> load_tests(util::cmd::Args& args) {
     auto test1 = HUH(read_test("./resources/test1.json"));
     auto test2 = HUH(read_test("./resources/test2.json"));
+    auto test3 = HUH(schema::cmd::cmd_loader<Test>::from(args));
 
-    auto test_loaded = HUH(schema::load(schema::context(), test2, test1));
+    auto test_loaded = HUH(schema::load(test1, test2, test3));
 
     print_test(test_loaded);
 
@@ -119,10 +128,12 @@ schema::detail::SchemaResult<> load_tests() {
 
 } // namespace
 
-int main() {
-    auto test_res = load_tests();
+int main(int argc, char* argv[]) {
+    auto args = util::cmd::Args::from_space_delimited(argc, argv);
+
+    auto test_res = load_tests(args);
     if (!test_res) {
-        std::println("Error: {}", test_res.error());
+        std::println("Error: {:t}", test_res.error());
         return -1;
     }
 

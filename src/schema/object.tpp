@@ -6,9 +6,11 @@
 #include "context.h"      // IWYU pragma: keep
 #include "generic_type.h" // IWYU pragma: keep
 #include "optional.h"     // IWYU pragma: keep
+#include "property.h"     // IWYU pragma: keep
 
 #include "detail/combiner.h"
 #include "schema/detail/schema_error.h"
+#include "util/meta/template_of.h"
 
 #include <meta>
 
@@ -38,6 +40,43 @@ consteval auto create_object_in_type() {
     }
 
     return std::meta::define_aggregate(ClassType, mem_specs);
+}
+
+template <typename T> //
+consteval auto in_object<T>::flatten() {
+    static constexpr auto arr =
+        std::meta::reflect_constant_array(flatten_impl());
+    return std::to_array([:arr:]);
+}
+
+template <typename T>
+template <std::meta::info... Path>
+consteval auto in_object<T>::flatten_impl() {
+    std::vector<std::meta::info> mems;
+
+    template for (constexpr auto mem : util::meta::nsdm_arr(^^data)) {
+        // get member type (Property<...>)
+        using p_t [[maybe_unused]] = [:std::meta::type_of(mem):];
+        using pd_t = typename p_t::data_type;
+
+        constexpr auto pd_info = std::meta::dealias(^^pd_t);
+
+        // if property itself is an in_object, recurse
+        if constexpr (util::meta::template_of<^^::schema::detail::in_object,
+                                              pd_info>) {
+            using sub_t = [:pd_info:];
+
+            auto n = sub_t::template flatten_impl<mem, Path...>();
+            mems.insert(mems.end(), n.begin(), n.end());
+        }
+
+        // reflect path
+        constexpr auto parr = std::to_array({mem, Path...});
+
+        mems.push_back(std::meta::reflect_constant(parr));
+    }
+
+    return mems;
 }
 
 // clang-format off
@@ -135,9 +174,8 @@ auto in_type<T>::to_out(data_type in) -> SchemaResult<T> {
             std::meta::has_default_member_initializer(out_mem);
 
         constexpr bool is_optional =
-            std::meta::has_template_arguments(std::meta::type_of(out_mem)) &&
-            std::meta::template_of(std::meta::type_of(out_mem)) ==
-                ^^std::optional;
+            util::meta::template_of<^^std::optional,
+                                    std::meta::type_of(out_mem)>;
 
         auto& value_opt = in.m_data.[:mem:].get();
 
@@ -208,6 +246,18 @@ detail::SchemaResult<T> load(const std::tuple<Context...>& context,
 
     //  convert to out type and return
     return HUH(in_type<T>::to_out(std::move(in1)));
+}
+
+// clang-format off
+template <
+    typename T,
+    typename... Ts
+>
+// clang-format on
+detail::SchemaResult<T> load(detail::in_object<T> in1, Ts&&... rest)
+    requires(std::convertible_to<Ts, detail::in_object<T>> && ...)
+{
+    return HUH(load(context(), in1, std::forward<Ts>(rest)...));
 }
 
 } // namespace schema

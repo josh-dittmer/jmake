@@ -2,7 +2,8 @@
 
 #include "tag.h"
 
-#include "util/meta/expand.h"
+#include "util/meta/annotation.h" // IWYU pragma: keep
+#include "util/meta/expand.h"     // IWYU pragma: keep
 
 #include <concepts>
 #include <meta>
@@ -49,18 +50,28 @@ template <
 constexpr std::optional<Tag> get_tag(Context&&... context) {
     std::optional<Tag> tag_data;
 
-    // clang-format off
-    [: util::meta::expand(std::meta::annotations_of(Member)) :] >> [&]<auto ann>() constexpr {
-        auto tag_val = tag_from_annotation<ann>(std::forward<Context>(context)...);
+    template for (constexpr auto ann : util::meta::ann_arr(Member)) {
+        auto tag_val =
+            tag_from_annotation<ann>(std::forward<Context>(context)...);
         using tag_type = decltype(tag_val);
 
         if constexpr (std::same_as<Tag, tag_type>) {
             tag_data = tag_val;
         }
-    };
-    // clang-format on
+    }
 
     return tag_data;
+}
+
+// clang-format off
+template <
+    std::meta::info Member,
+    typename Tag,
+    typename... Context
+>
+// clang-format on
+constexpr bool has_tag(Context&&... context) {
+    return get_tag<Member, Tag>(std::forward<Context>(context)...).has_value();
 }
 
 } // namespace schema

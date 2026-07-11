@@ -4,8 +4,8 @@
 
 namespace util::cmd {
 
-CmdArgs CmdArgs::from_space_delimited(std::size_t argc,
-                                      char* argv[]) { // NOLINT
+Args Args::from_space_delimited(std::size_t argc,
+                                char* argv[]) { // NOLINT
     DataType data;
 
     for (std::size_t i = 1; i < argc; i++) {
@@ -29,11 +29,11 @@ CmdArgs CmdArgs::from_space_delimited(std::size_t argc,
         }
     }
 
-    return CmdArgs(std::move(data));
+    return Args(std::move(data));
 }
 
-CmdArgs CmdArgs::from_equals_delimited(std::size_t argc,
-                                       char* argv[]) { // NOLINT
+Args Args::from_equals_delimited(std::size_t argc,
+                                 char* argv[]) { // NOLINT
     DataType data;
 
     for (std::size_t i = 1; i < argc; i++) {
@@ -50,10 +50,10 @@ CmdArgs CmdArgs::from_equals_delimited(std::size_t argc,
         }
     }
 
-    return CmdArgs(std::move(data));
+    return Args(std::move(data));
 }
 
-Opt<CmdArgs::ValueType> CmdArgs::pop(const std::string& key) {
+Opt<Args::ValueType> Args::pop(const std::string& key) {
     auto mit = m_data.find(key);
     if (mit == m_data.end()) {
         return std::nullopt;
