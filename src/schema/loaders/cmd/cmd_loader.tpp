@@ -15,14 +15,14 @@ namespace schema::cmd {
 
 template <typename T> //
 consteval auto cmd_loader<T>::create_flag_array() {
-    static constexpr auto flattened = in_t::flatten();
+    static constexpr auto flattened = std::define_static_array(in_t::flatten());
 
     using pair_t = std::pair<const char*, setter_fn>;
     std::vector<pair_t> pairs;
 
     template for (constexpr auto p : flattened) {
         constexpr auto path = [:p:];
-        constexpr auto mem = get_out_member<path[0]>();
+        constexpr auto mem = path[0];
 
         // skip if member is disabled
         if constexpr (has_tag<mem, disable>() || has_tag<^^T, disable>()) {

@@ -4,6 +4,7 @@
 #include "detail/in_type.h"
 #include "detail/schema_error.h"
 #include "detail/validator.h"
+#include "property.h"
 
 #include "util/meta/nsdm.h" // IWYU pragma: keep
 
@@ -24,7 +25,10 @@ template <
 extern consteval auto create_object_in_type();
 
 // clang-format off
-template <typename T>
+template <
+    typename T,
+    std::meta::info Parent
+>
 // clang-format on
 struct in_object {
     struct data;
@@ -32,13 +36,8 @@ struct in_object {
 
     using data_type = data;
 
-    // pair: {constant array, member}
-    using flat_pair = std::pair<std::meta::info, std::meta::info>;
-
-    static consteval auto flatten();
-
     template <std::meta::info... Path> //
-    static consteval auto flatten_impl();
+    static consteval auto flatten();
 
     data_type m_data;
 };

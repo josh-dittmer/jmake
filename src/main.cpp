@@ -102,14 +102,15 @@ using in_object_t = schema::detail::in_object<Test>;
 namespace {
 
 Result<in_object_t> read_test(std::string_view path) {
-    const auto& file = HUH(util::file::read<std::string>(path));
+    /*const auto& file = HUH(util::file::read<std::string>(path));
 
     auto json_res = glz::read_json<in_object_t>(file);
     if (!json_res) {
         return err(glz::format_error(json_res.error()));
     }
 
-    return *json_res;
+    return *json_res;*/
+    return err(path);
 }
 
 void print_test(const Test& test) { std::println("{:n}", test); }

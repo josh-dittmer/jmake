@@ -6,7 +6,6 @@
 #include "context.h"      // IWYU pragma: keep
 #include "generic_type.h" // IWYU pragma: keep
 #include "optional.h"     // IWYU pragma: keep
-#include "property.h"     // IWYU pragma: keep
 
 #include "detail/combiner.h"
 #include "schema/detail/schema_error.h"
@@ -42,38 +41,22 @@ consteval auto create_object_in_type() {
     return std::meta::define_aggregate(ClassType, mem_specs);
 }
 
-template <typename T> //
-consteval auto in_object<T>::flatten() {
-    static constexpr auto arr =
-        std::meta::reflect_constant_array(flatten_impl());
-    return std::to_array([:arr:]);
-}
-
-template <typename T>
+// clang-format off
+template <
+    typename T,
+    std::meta::info Parent
+>
 template <std::meta::info... Path>
-consteval auto in_object<T>::flatten_impl() {
+// clang-format on
+consteval auto in_object<T, Parent>::flatten() {
     std::vector<std::meta::info> mems;
 
     template for (constexpr auto mem : util::meta::nsdm_arr(^^data)) {
         // get member type (Property<...>)
         using p_t [[maybe_unused]] = [:std::meta::type_of(mem):];
-        using pd_t = typename p_t::data_type;
 
-        constexpr auto pd_info = std::meta::dealias(^^pd_t);
-
-        // if property itself is an in_object, recurse
-        if constexpr (util::meta::template_of<^^::schema::detail::in_object,
-                                              pd_info>) {
-            using sub_t = [:pd_info:];
-
-            auto n = sub_t::template flatten_impl<mem, Path...>();
-            mems.insert(mems.end(), n.begin(), n.end());
-        }
-
-        // reflect path
-        constexpr auto parr = std::to_array({mem, Path...});
-
-        mems.push_back(std::meta::reflect_constant(parr));
+        auto p_mems = p_t::template flatten<Path...>();
+        mems.insert(mems.end(), p_mems.begin(), p_mems.end());
     }
 
     return mems;
